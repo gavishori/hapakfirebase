@@ -11,9 +11,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Warm Neutrals -->
-    <!-- Application Structure Plan: A single-page, task-oriented application designed for efficient data entry and management, now without persistent storage (data is in-memory). The primary input area features report description, reporter, log type, and action buttons arranged horizontally on larger screens for compact and efficient interaction. Date and time inputs are hidden by default and only appear when editing an existing report. When visible for editing, the date input uses a native picker, and the time input allows direct manual typing. On smaller screens, these elements gracefully stack vertically to maintain usability. This consolidated input block is followed by the main content area displaying the data table. The table features date-based grouping with expand/collapse functionality (default collapsed for non-today dates) and global expand/collapse controls. Sorting is hybrid: new additions go to top (LIFO), while updates trigger a full chronological sort (date descending, then time descending) for the entire table. -->
-    <!-- Visualization & Content Choices: Report Data -> Goal: Input/Manage -> Presentation: Consolidated HTML Form (for add/edit) & Grouped Collapsible HTML Table -> Interaction: Users input data via form. Add button is LIFO (visual). Update button triggers full chronological sort. Edit button reveals date/time inputs for modification. Date input is type="date". Time input is type="text" with manual input. Global/per-day buttons control collapse state. Textarea auto-resizes in add mode, fixed height in edit. Justification: Enhanced usability for data entry and review, clear visual organization, and precise adherence to complex sorting requirements without external dependencies for data persistence. Library/Method: Vanilla JS for DOM manipulation and state management, Tailwind CSS for styling and responsiveness. -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 </head>
 <body class="bg-[#FDFBF7] text-[#4A443E]">
 
@@ -21,6 +18,7 @@
 
         <header class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53]">יומן חפ"ק - לפיד</h1>
+            <div id="userIdDisplay" class="text-sm text-gray-600 mt-2"></div>
         </header>
 
         <main class="bg-white rounded-xl shadow-lg p-6 ring-1 ring-[#EAE2D9]">
@@ -62,7 +60,8 @@
                             </div>
                         </div>
 
-                        <div class="flex-shrink-0 w-full sm:w-auto flex flex-row sm:flex-col items-end gap-2"> <button id="mainActionBtn" class="btn-primary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto">הזן</button>
+                        <div class="flex-shrink-0 w-full sm:w-auto flex flex-row sm:flex-col items-end gap-2"> 
+                            <button id="mainActionBtn" class="btn-primary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto">הזן</button>
                             <button id="cancelEditBtn" class="btn-secondary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto hidden">ביטול</button>
                         </div>
                     </div>
@@ -92,6 +91,9 @@
                         <tr id="empty-state">
                             <td colspan="6" class="table-cell text-center text-gray-500 py-8">לא נוספו דיווחים עדיין.</td>
                         </tr>
+                        <tr id="loading-state" class="hidden">
+                            <td colspan="6" class="table-cell text-center text-gray-500 py-8">טוען דיווחים...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -99,7 +101,10 @@
 
     </div>
 
+    <!-- Firebase services will now be imported from firebase.js -->
+    <script type="module" src="firebase.js"></script>
+    
     <!-- Custom JavaScript -->
-    <script src="script.js" defer></script>
+    <script src="script.js" defer type="module"></script>
 </body>
 </html>

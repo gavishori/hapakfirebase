@@ -4,6 +4,33 @@ let editingReportIndex = null;
 let lastAddedReportId = null; 
 let collapsedGroups = new Set(); 
 
+// Import Firebase variables and functions from firebase.js
+import { 
+    db, 
+    auth, 
+    appId, // Use the exported appId
+    initialAuthToken, // Use the exported initialAuthToken
+    onAuthStateChanged,
+    addDoc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    onSnapshot, 
+    collection, 
+    doc, // Import doc specifically for doc references
+    // FieldValue is NO LONGER imported from firebase.js
+    signInAnonymously, // Ensure this is explicitly imported
+    signInWithCustomToken // Ensure this is explicitly imported
+} from './firebase.js'; // Adjust path if firebase.js is in a different folder
+
+// Import FieldValue DIRECTLY from the Firestore SDK to ensure correct serverTimestamp() access
+import { FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+let currentUserId = null;
+let reportsCollectionRef = null;
+let unsubscribeFromReports = null; // To store the unsubscribe function for real-time listener
+
 // Global DOM element references (initialized in DOMContentLoaded)
 let filterReporter;
 let filterLogType;
@@ -11,13 +38,15 @@ let generalTextInput;
 let newDateInput; 
 let newTimeInput; 
 let dateTimeInputsWrapper; 
-let mainActionBtn; // Declared globally
+let mainActionBtn; 
 let cancelEditBtn;
 let tableBody;
 let emptyStateRow;
+let loadingStateRow; // New loading state row
 let expandAllBtn;
 let collapseAllBtn;
 let inputErrorMessage;
+let userIdDisplay; // New element to display user ID
 
 
 // --- Auto-resize Textarea Logic ---
@@ -32,13 +61,13 @@ const setDefaultDateTime = () => {
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
-    if (newDateInput) { // Add a check for newDateInput to prevent errors if it's undefined
+    if (newDateInput) { 
         newDateInput.value = `${year}-${month}-${day}`;
     }
     
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
-    if (newTimeInput) { // Add a check for newTimeInput
+    if (newTimeInput) { 
         newTimeInput.value = `${hours}:${minutes}`; 
     }
 };
@@ -67,6 +96,7 @@ const sortChronologically = (arrToSort) => {
         if (dateA > dateB) return -1; 
         if (dateA < dateB) return 1;  
 
+        // If dates are the same, sort by time (descending)
         if (a.time > b.time) return -1; 
         if (a.time < b.time) return 1;  
 
@@ -76,18 +106,28 @@ const sortChronologically = (arrToSort) => {
 
 // Renders the table content based on the reports array and current sorting rules
 const renderTable = () => {
-    if (!tableBody) { // Add a check here for tableBody
+    if (!tableBody) { 
         console.error('tableBody element not found. Cannot render table.');
         return;
     }
     tableBody.innerHTML = ''; // Clear existing table body
     
+    // Hide loading state
+    if (loadingStateRow) {
+        loadingStateRow.classList.add('hidden');
+    }
+
     if (reports.length === 0) {
-        if (emptyStateRow) { // Add a check for emptyStateRow
+        if (emptyStateRow) { 
+            emptyStateRow.classList.remove('hidden'); // Show empty state
             tableBody.appendChild(emptyStateRow);
         }
         console.log('No reports to display.');
         return;
+    } else {
+        if (emptyStateRow) {
+            emptyStateRow.classList.add('hidden'); // Hide empty state if there are reports
+        }
     }
 
     let finalDisplayList = [...reports]; 
@@ -154,7 +194,14 @@ const renderTable = () => {
         const innerTbody = document.createElement('tbody');
 
         // Render individual report rows inside the inner table
-        reportsForDate.forEach(report => {
+        // Sort reports within the same date group by time (descending)
+        const sortedReportsForDate = [...reportsForDate].sort((a, b) => {
+            if (a.time > b.time) return -1;
+            if (a.time < b.time) return 1;
+            return 0;
+        });
+
+        sortedReportsForDate.forEach(report => {
             const reportRow = document.createElement('tr');
             reportRow.className = 'hover:bg-[#F8F5F1]';
             reportRow.innerHTML = `
@@ -165,6 +212,7 @@ const renderTable = () => {
                 <td class="table-cell">${report.logType}</td>
                 <td class="table-cell text-center whitespace-nowrap">
                     <button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>
+                    <button data-id="${report.id}" class="text-red-600 hover:text-red-800 font-semibold delete-btn ml-2">מחק</button>
                 </td>
             `;
             innerTbody.appendChild(reportRow);
@@ -176,12 +224,13 @@ const renderTable = () => {
         tableBody.appendChild(reportsContainerRow);
         
         // Default collapse/expand logic for initial rendering
+        // Only collapse if not today AND it's not already in the collapsedGroups set
         if (!isToday && !collapsedGroups.has(dateKey)) {
-            collapsedGroups.add(dateKey);
-            reportsContainerRow.classList.add('hidden');
+            collapsedGroups.add(dateKey); // Add to set to mark as collapsed
+            reportsContainerRow.classList.add('hidden'); // Hide the content
             const toggleButton = headerRow.querySelector('.toggle-day-btn');
-            if (toggleButton) { // Add a check here
-                toggleButton.textContent = '◀';
+            if (toggleButton) { 
+                toggleButton.textContent = '◀'; // Change arrow to indicate collapsed
             }
         }
     });
@@ -204,14 +253,14 @@ const renderTable = () => {
         });
     });
     
-    console.log('Current reports array (raw data from Firestore):', reports); 
+    console.log('Current reports array (raw data from Firebase):', reports); 
     console.log('Reports displayed in table (after hybrid sorting and grouping):', finalDisplayList);
     console.log('Collapsed Groups State:', collapsedGroups);
 };
 
 // Clears the input fields and resets the form to "add new report" mode
 const resetForm = () => {
-    if (generalTextInput) { // Add check here
+    if (generalTextInput) { 
         generalTextInput.value = '';
         generalTextInput.rows = 3; 
         generalTextInput.style.height = 'auto'; 
@@ -220,38 +269,39 @@ const resetForm = () => {
     }
 
     setDefaultDateTime(); 
-    if (generalTextInput) { // Add check here
+    if (generalTextInput) { 
         generalTextInput.focus();
     }
     editingReportIndex = null; 
-    if (mainActionBtn) { // Add check here
+    if (mainActionBtn) { 
         mainActionBtn.textContent = 'הזן';
     }
-    if (cancelEditBtn) { // Add check here
+    if (cancelEditBtn) { 
         cancelEditBtn.classList.add('hidden');
     }
-    if (inputErrorMessage) { // Add check here
+    if (inputErrorMessage) { 
         inputErrorMessage.textContent = '';
     }
     
-    if (dateTimeInputsWrapper) { // Add check here
+    if (dateTimeInputsWrapper) { 
         dateTimeInputsWrapper.classList.add('hidden'); 
     }
 
-    if (newDateInput) { // Add check here
+    if (newDateInput) { 
         newDateInput.readOnly = false; 
     }
-    if (newTimeInput) { // Add check here
+    if (newTimeInput) { 
         newTimeInput.readOnly = false; 
     }
-
-    renderTable(); 
+    // No renderTable() here, as onSnapshot will trigger it
 };
 
-// Adds a new report
-const addReport = () => { 
-    if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage) {
-        console.error('One or more required input elements are not initialized.');
+// Adds a new report to Firestore
+const addReport = async () => { 
+    if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage || !reportsCollectionRef) {
+        console.error('One or more required input elements or Firebase collection reference are not initialized.');
+        inputErrorMessage.textContent = 'שגיאה: רכיבי קלט או בסיס נתונים אינם זמינים.';
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
         return;
     }
 
@@ -263,33 +313,39 @@ const addReport = () => {
     const logType = filterLogType.value;   
 
     if (!description) { 
-        inputErrorMessage.textContent = 'יש למ מלא את שדה תיאור הדיווח.';
+        inputErrorMessage.textContent = 'יש למלא את שדה תיאור הדיווח.';
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
 
-    const newReport = { 
-        id: crypto.randomUUID(), 
+    const newReportData = { 
         description, 
         date, 
         time, 
         reporter, 
         logType,
+        //createdAt: FieldValue.serverTimestamp() 
     };
 
-    reports.unshift(newReport); // Add to the BEGINNING of the internal array
-    lastAddedReportId = newReport.id; // Mark this as the last added report
-    
-    collapsedGroups.delete(newReport.date); // Open the group for the newly added report
-
-    renderTable(); 
-    resetForm(); 
+    try {
+        const docRef = await addDoc(reportsCollectionRef, newReportData);
+        console.log("Document written with ID: ", docRef.id);
+        lastAddedReportId = docRef.id; // Mark this as the last added report by its Firestore ID
+        collapsedGroups.delete(newReportData.date); // Open the group for the newly added report
+        resetForm(); 
+    } catch (e) {
+        console.error("Error adding document: ", e);
+        inputErrorMessage.textContent = 'שגיאה בשמירת דיווח: ' + e.message;
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
+    }
 };
 
-// Updates an existing report
-const updateReport = () => { 
-    if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage) {
-        console.error('One or more required input elements are not initialized for update.');
+// Updates an existing report in Firestore
+const updateReport = async () => { 
+    if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage || !reportsCollectionRef || editingReportIndex === null) {
+        console.error('One or more required input elements or Firebase collection reference are not initialized for update, or no report is being edited.');
+        inputErrorMessage.textContent = 'שגיאה: רכיבי קלט או בסיס נתונים אינם זמינים לעדכון.';
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
         return;
     }
 
@@ -301,7 +357,7 @@ const updateReport = () => {
     const logType = filterLogType.value;   
 
     if (!description || !date || !time) { 
-        inputErrorMessage.textContent = 'יש למלא את כל השדות: תיאור, תאריך ושעה.';
+        inputErrorMessage.textContent = 'יש למ מלא את כל השדות: תיאור, תאריך ושעה.';
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
@@ -311,28 +367,67 @@ const updateReport = () => {
         return;
     }
 
-    if (editingReportIndex !== null) {
-        const reportToUpdate = reports[editingReportIndex];
-        reportToUpdate.description = description;
-        reportToUpdate.date = date;
-        reportToUpdate.time = time;
-        reportToUpdate.reporter = reporter;
-        reportToUpdate.logType = logType;
+    const reportToUpdate = reports[editingReportIndex];
+    if (!reportToUpdate || !reportToUpdate.id) {
+        console.error('No valid report selected for update or missing ID.');
+        inputErrorMessage.textContent = 'שגיאה: לא נבחר דיווח חוקי לעדכון.';
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
+        return;
+    }
 
-        
-        reports = sortChronologically(reports); // Sorts the global 'reports' array directly
+    const updatedReportData = {
+        description,
+        date,
+        time,
+        reporter,
+        logType,
+        // createdAt should not be updated, or update an 'updatedAt' field if desired
+    };
+
+    try {
+        // Use `doc` with `db` and the full path
+        const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/reports`, reportToUpdate.id);
+        await setDoc(docRef, updatedReportData, { merge: true }); // Use merge to only update specified fields
+        console.log("Document updated with ID: ", reportToUpdate.id);
         lastAddedReportId = null; // Clear last added to ensure full chronological sort is dominant now
-        
         collapsedGroups.delete(reportToUpdate.date); // Open the group for the updated report
-
-        renderTable(); 
         resetForm(); 
+    } catch (e) {
+        console.error("Error updating document: ", e);
+        inputErrorMessage.textContent = 'שגיאה בעדכון דיווח: ' + e.message;
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
+    }
+};
+
+// Deletes a report from Firestore
+const deleteReport = async (reportId) => {
+    if (!reportId || !reportsCollectionRef) {
+        console.error('Report ID or Firebase collection reference is missing for deletion.');
+        return;
+    }
+
+    // IMPORTANT: Custom modal UI instead of confirm()
+    const confirmDelete = window.confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // For quick demo, keeping confirm, replace with custom modal
+    if (!confirmDelete) {
+        return;
+    }
+
+    try {
+        const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/reports`, reportId);
+        await deleteDoc(docRef);
+        console.log("Document successfully deleted!");
+        // No need to manually update `reports` array, onSnapshot will handle it
+        resetForm(); // Reset form after deletion
+    } catch (e) {
+        console.error("Error removing document: ", e);
+        inputErrorMessage.textContent = 'שגיאה במחיקת דיווח: ' + e.message;
+        setTimeout(() => inputErrorMessage.textContent = '', 5000);
     }
 };
 
 
 // DOMContentLoaded listener - All DOM element references and initial event listeners are set here
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Initialize global DOM element references
     filterReporter = document.getElementById('filterReporter');
     filterLogType = document.getElementById('filterLogType');
@@ -340,57 +435,104 @@ document.addEventListener('DOMContentLoaded', () => {
     newDateInput = document.getElementById('newDate'); 
     newTimeInput = document.getElementById('newTime'); 
     dateTimeInputsWrapper = document.getElementById('dateTimeInputsWrapper'); 
-    mainActionBtn = document.getElementById('mainActionBtn'); // Initialization happens here
+    mainActionBtn = document.getElementById('mainActionBtn'); 
     cancelEditBtn = document.getElementById('cancelEditBtn');
     tableBody = document.getElementById('reportTableBody');
     emptyStateRow = document.getElementById('empty-state');
+    loadingStateRow = document.getElementById('loading-state'); // Get loading state row
     inputErrorMessage = document.getElementById('inputErrorMessage');
     expandAllBtn = document.getElementById('expandAllBtn'); 
     collapseAllBtn = document.getElementById('collapseAllBtn'); 
+    userIdDisplay = document.getElementById('userIdDisplay'); // Get user ID display element
 
-    // --- IMPORTANT: Confirm initialization status ---
-    console.log('mainActionBtn after getElementById:', mainActionBtn); 
-    console.log('cancelEditBtn after getElementById:', cancelEditBtn); 
-
-    // Attach global expand/collapse buttons listeners here, after elements are guaranteed to exist
-    if (expandAllBtn) {
-        expandAllBtn.addEventListener('click', () => {
-            collapsedGroups.clear(); 
-            // Query for all date group content rows
-            document.querySelectorAll('.date-group-content').forEach(div => {
-                div.classList.remove('hidden'); 
-            });
-            // Query for all toggle buttons
-            document.querySelectorAll('.toggle-day-btn').forEach(button => {
-                button.textContent = '▼'; 
-            });
-        });
-    } else {
-        console.error('expandAllBtn element not found!');
+    // --- Firebase Initialization (auth state listener) ---
+    // The Firebase app itself is initialized in firebase.js.
+    // Here we set up the auth state listener using the 'auth' object imported from firebase.js.
+    if (!auth || !db) {
+        console.error('Firebase Auth or Firestore not initialized. Check firebase.js for errors.');
+        inputErrorMessage.textContent = 'שגיאה: Firebase לא אותחל באופן מלא.';
+        return;
     }
 
-    if (collapseAllBtn) {
-        collapseAllBtn.addEventListener('click', () => {
-            collapsedGroups.clear(); 
-            const allDateKeysInTable = Array.from(new Set(reports.map(r => r.date)));
-            allDateKeysInTable.forEach(key => collapsedGroups.add(key));
-
-            // Query for all date group content rows
-            document.querySelectorAll('.date-group-content').forEach(div => {
-                div.classList.add('hidden'); 
-            });
-            // Query for all toggle buttons
-            document.querySelectorAll('.toggle-day-btn').forEach(button => {
-                button.textContent = '◀'; 
-            });
-        });
-    } else {
-        console.error('collapseAllBtn element not found!');
+    // Display loading state initially
+    if (loadingStateRow) {
+        loadingStateRow.classList.remove('hidden');
     }
+    if (emptyStateRow) {
+        emptyStateRow.classList.add('hidden');
+    }
+
+    // --- Add console logs for immediate debugging of imports ---
+    console.log('script.js: db imported?', !!db);
+    console.log('script.js: auth imported?', !!auth);
+    console.log('script.js: signInAnonymously imported?', !!signInAnonymously);
+    console.log('script.js: signInWithCustomToken imported?', !!signInWithCustomToken);
+    console.log('script.js: FieldValue imported?', !!FieldValue);
+
+
+    // Listen for auth state changes using the imported onAuthStateChanged
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUserId = user.uid;
+            console.log('User signed in. UID:', currentUserId);
+            if (userIdDisplay) {
+                userIdDisplay.textContent = `מחובר כ: ${currentUserId}`;
+            }
+
+            // Set up Firestore collection reference for the current user
+            // Use 'collection' imported from firebase.js
+            reportsCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/reports`);
+            console.log('Reports collection path:', `artifacts/${appId}/users/${currentUserId}/reports`);
+
+            // Unsubscribe from previous listener if exists
+            if (unsubscribeFromReports) {
+                unsubscribeFromReports();
+            }
+
+            // Set up real-time listener for reports
+            // Use 'onSnapshot' imported from firebase.js
+            unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
+                const fetchedReports = [];
+                snapshot.forEach(doc => {
+                    fetchedReports.push({ id: doc.id, ...doc.data() });
+                });
+                reports = sortChronologically(fetchedReports); // Sort data after fetching
+                console.log('Reports fetched and sorted:', reports);
+                renderTable(); // Re-render table with fetched data
+            }, (error) => {
+                console.error("Error getting reports in real-time: ", error);
+                inputErrorMessage.textContent = 'שגיאה בטעינת דיווחים: ' + error.message;
+            });
+
+        } else {
+            console.log('No user signed in. Attempting anonymous sign-in...');
+            if (userIdDisplay) {
+                userIdDisplay.textContent = 'מצב אורח (טוען...)';
+            }
+            try {
+                // Use 'signInWithCustomToken' or 'signInAnonymously' imported from firebase.js
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth); 
+                }
+            } catch (error) {
+                console.error('Error signing in:', error);
+                inputErrorMessage.textContent = 'שגיאה בהתחברות: ' + error.message;
+                if (userIdDisplay) {
+                    userIdDisplay.textContent = 'מצב אורח (שגיאת התחברות)';
+                }
+                // If sign-in fails, hide loading and show empty state
+                if (loadingStateRow) loadingStateRow.classList.add('hidden');
+                if (emptyStateRow) emptyStateRow.classList.remove('hidden');
+            }
+        }
+    });
+
+    // --- Attach Event Listeners (after DOM elements are initialized) ---
 
     // Handle the click on the main action button (Add/Update)
-    // This event listener is placed AFTER mainActionBtn is initialized above
-    if (mainActionBtn) { // Add a check to ensure mainActionBtn is not null/undefined
+    if (mainActionBtn) { 
         mainActionBtn.addEventListener('click', () => {
             if (editingReportIndex === null) {
                 addReport();
@@ -403,16 +545,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Handle the click on the cancel edit button
-    if (cancelEditBtn) { // Add a check here
+    if (cancelEditBtn) { 
         cancelEditBtn.addEventListener('click', resetForm);
     } else {
         console.error('cancelEditBtn element not found! Cannot attach event listener.');
     }
 
+    // Attach global expand/collapse buttons listeners
+    if (expandAllBtn) {
+        expandAllBtn.addEventListener('click', () => {
+            collapsedGroups.clear(); 
+            document.querySelectorAll('.date-group-content').forEach(div => {
+                div.classList.remove('hidden'); 
+            });
+            document.querySelectorAll('.toggle-day-btn').forEach(button => {
+                button.textContent = '▼'; 
+            });
+        });
+    } else {
+        console.error('expandAllBtn element not found!');
+    }
 
-    // Event delegation for table actions (edit)
-    // This listener is also placed within DOMContentLoaded
-    if (tableBody) { // Add a check here
+    if (collapseAllBtn) {
+        collapseAllBtn.addEventListener('click', () => {
+            collapsedGroups.clear(); 
+            // Get all unique dates currently in the reports array
+            const allDateKeysInTable = Array.from(new Set(reports.map(r => r.date)));
+            allDateKeysInTable.forEach(key => collapsedGroups.add(key));
+
+            document.querySelectorAll('.date-group-content').forEach(div => {
+                div.classList.add('hidden'); 
+            });
+            document.querySelectorAll('.toggle-day-btn').forEach(button => {
+                button.textContent = '◀'; 
+            });
+        });
+    } else {
+        console.error('collapseAllBtn element not found!');
+    }
+
+    // Event delegation for table actions (edit and delete)
+    if (tableBody) { 
         tableBody.addEventListener('click', (e) => {
             // Edit button
             if (e.target.classList.contains('edit-btn')) {
@@ -447,21 +620,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     generalTextInput.classList.add('edit-mode-fixed-height'); 
                 }
 
-                // Date input should allow picker, not manual typing (type="date")
                 if (newDateInput) newDateInput.readOnly = false; 
-
-                // Time input should allow direct manual input (type="text")
                 if (newTimeInput) newTimeInput.readOnly = false; 
 
                 if (generalTextInput) generalTextInput.focus(); 
             }
+            // Delete button
+            else if (e.target.classList.contains('delete-btn')) {
+                const reportIdToDelete = e.target.getAttribute('data-id');
+                deleteReport(reportIdToDelete);
+            }
         });
     } else {
-        console.error('tableBody element not found! Cannot attach event delegation.');
+        console.error('tableBody element not found! Cannot attach event delegation for edit/delete.');
     }
 
-    // Initialize default date and time, and render table on load
+    // Initialize default date and time
     setDefaultDateTime();
+    // resetForm() is called initially, but renderTable is now driven by onSnapshot
+    // resetForm() will ensure inputs are clear after initialization
     resetForm(); 
 });
-
