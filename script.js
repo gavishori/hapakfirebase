@@ -13,8 +13,7 @@ import {
     onAuthStateChanged,
     addDoc, 
     setDoc, 
-    updateDoc, 
-    deleteDoc, 
+    // deleteDoc, // deleteDoc is no longer needed as delete functionality is removed
     onSnapshot, 
     collection, 
     doc, // Import doc specifically for doc references
@@ -46,7 +45,8 @@ let loadingStateRow; // New loading state row
 let expandAllBtn;
 let collapseAllBtn;
 let inputErrorMessage;
-let userIdDisplay; // New element to display user ID
+// userIdDisplay is removed as it's no longer needed in the UI
+// let userIdDisplay; 
 
 
 // --- Auto-resize Textarea Logic ---
@@ -212,7 +212,7 @@ const renderTable = () => {
                 <td class="table-cell">${report.logType}</td>
                 <td class="table-cell text-center whitespace-nowrap">
                     <button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>
-                    <button data-id="${report.id}" class="text-red-600 hover:text-red-800 font-semibold delete-btn ml-2">מחק</button>
+                    <!-- Delete button removed -->
                 </td>
             `;
             innerTbody.appendChild(reportRow);
@@ -382,13 +382,12 @@ const updateReport = async () => {
         time,
         reporter,
         logType,
-        // creatorId should remain the same
-        // createdAt should not be updated
+        // creatorId and createdAt should remain the same
     };
 
     try {
         // Use `doc` with `db` and the full path
-        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); // Updated path for public collection
+        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); // Path to the public collection
         await setDoc(docRef, updatedReportData, { merge: true }); // Use merge to only update specified fields
         console.log("Document updated with ID: ", reportToUpdate.id);
         lastAddedReportId = null; // Clear last added to ensure full chronological sort is dominant now
@@ -401,32 +400,7 @@ const updateReport = async () => {
     }
 };
 
-// Deletes a report from Firestore
-const deleteReport = async (reportId) => {
-    if (!reportId || !reportsCollectionRef) {
-        console.error('Report ID or Firebase collection reference is missing for deletion.');
-        return;
-    }
-
-    // IMPORTANT: Custom modal UI instead of confirm()
-    const confirmDelete = window.confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // For quick demo, keeping confirm, replace with custom modal
-    if (!confirmDelete) {
-        return;
-    }
-
-    try {
-        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportId); // Updated path for public collection
-        await deleteDoc(docRef);
-        console.log("Document successfully deleted!");
-        // No need to manually update `reports` array, onSnapshot will handle it
-        resetForm(); // Reset form after deletion
-    } catch (e) {
-        console.error("Error removing document: ", e);
-        inputErrorMessage.textContent = 'שגיאה במחיקת דיווח: ' + e.message;
-        setTimeout(() => inputErrorMessage.textContent = '', 5000);
-    }
-};
-
+// deleteReport function is removed
 
 // DOMContentLoaded listener - All DOM element references and initial event listeners are set here
 document.addEventListener('DOMContentLoaded', async () => {
@@ -445,7 +419,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     inputErrorMessage = document.getElementById('inputErrorMessage');
     expandAllBtn = document.getElementById('expandAllBtn'); 
     collapseAllBtn = document.getElementById('collapseAllBtn'); 
-    userIdDisplay = document.getElementById('userIdDisplay'); // Get user ID display element
+    // userIdDisplay element is removed from HTML, so no need to getElementById
+    // userIdDisplay = document.getElementById('userIdDisplay'); 
 
     // --- Firebase Initialization (auth state listener) ---
     // The Firebase app itself is initialized in firebase.js.
@@ -477,9 +452,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (user) {
             currentUserId = user.uid;
             console.log('User signed in. UID:', currentUserId);
-            if (userIdDisplay) {
-                userIdDisplay.textContent = `מחובר כ: ${currentUserId}`;
-            }
+            // userIdDisplay removed: no need to update textContent
+            // if (userIdDisplay) {
+            //     userIdDisplay.textContent = `מחובר כ: ${currentUserId}`;
+            // }
 
             // Set up Firestore collection reference for the PUBLIC collection
             reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
@@ -506,9 +482,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } else {
             console.log('No user signed in. Attempting anonymous sign-in...');
-            if (userIdDisplay) {
-                userIdDisplay.textContent = 'מצב אורח (טוען...)';
-            }
+            // userIdDisplay removed: no need to update textContent
+            // if (userIdDisplay) {
+            //     userIdDisplay.textContent = 'מצב אורח (טוען...)';
+            // }
             try {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
@@ -518,9 +495,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (error) {
                 console.error('Error signing in:', error);
                 inputErrorMessage.textContent = 'שגיאה בהתחברות: ' + error.message;
-                if (userIdDisplay) {
-                    userIdDisplay.textContent = 'מצב אורח (שגיאת התחברות)';
-                }
+                // userIdDisplay removed: no need to update textContent
+                // if (userIdDisplay) {
+                //     userIdDisplay.textContent = 'מצב אורח (שגיאת התחברות)';
+                // }
                 // If sign-in fails, hide loading and show empty state
                 if (loadingStateRow) loadingStateRow.classList.add('hidden');
                 if (emptyStateRow) emptyStateRow.classList.remove('hidden');
@@ -583,7 +561,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('collapseAllBtn element not found!');
     }
 
-    // Event delegation for table actions (edit and delete)
+    // Event delegation for table actions (edit only, delete removed)
     if (tableBody) { 
         tableBody.addEventListener('click', (e) => {
             // Edit button
@@ -624,14 +602,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (generalTextInput) generalTextInput.focus(); 
             }
-            // Delete button
-            else if (e.target.classList.contains('delete-btn')) {
-                const reportIdToDelete = e.target.getAttribute('data-id');
-                deleteReport(reportIdToDelete);
-            }
+            // Delete button logic removed
         });
     } else {
-        console.error('tableBody element not found! Cannot attach event delegation for edit/delete.');
+        console.error('tableBody element not found! Cannot attach event delegation for edit.');
     }
 
     // Initialize default date and time
