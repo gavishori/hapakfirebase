@@ -18,7 +18,6 @@ import {
     onSnapshot, 
     collection, 
     doc, // Import doc specifically for doc references
-    // FieldValue is NO LONGER imported from firebase.js
     signInAnonymously, // Ensure this is explicitly imported
     signInWithCustomToken // Ensure this is explicitly imported
 } from './firebase.js'; // Adjust path if firebase.js is in a different folder
@@ -28,7 +27,8 @@ import { FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-f
 
 
 let currentUserId = null;
-let reportsCollectionRef = null;
+// reportsCollectionRef will now point to the PUBLIC collection
+let reportsCollectionRef = null; 
 let unsubscribeFromReports = null; // To store the unsubscribe function for real-time listener
 
 // Global DOM element references (initialized in DOMContentLoaded)
@@ -324,6 +324,7 @@ const addReport = async () => {
         time, 
         reporter, 
         logType,
+        creatorId: currentUserId, // Add the ID of the user who created the report
         //createdAt: FieldValue.serverTimestamp() 
     };
 
@@ -381,12 +382,13 @@ const updateReport = async () => {
         time,
         reporter,
         logType,
-        // createdAt should not be updated, or update an 'updatedAt' field if desired
+        // creatorId should remain the same
+        // createdAt should not be updated
     };
 
     try {
         // Use `doc` with `db` and the full path
-        const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/reports`, reportToUpdate.id);
+        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); // Updated path for public collection
         await setDoc(docRef, updatedReportData, { merge: true }); // Use merge to only update specified fields
         console.log("Document updated with ID: ", reportToUpdate.id);
         lastAddedReportId = null; // Clear last added to ensure full chronological sort is dominant now
@@ -413,7 +415,7 @@ const deleteReport = async (reportId) => {
     }
 
     try {
-        const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/reports`, reportId);
+        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportId); // Updated path for public collection
         await deleteDoc(docRef);
         console.log("Document successfully deleted!");
         // No need to manually update `reports` array, onSnapshot will handle it
@@ -479,10 +481,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 userIdDisplay.textContent = `מחובר כ: ${currentUserId}`;
             }
 
-            // Set up Firestore collection reference for the current user
-            // Use 'collection' imported from firebase.js
-            reportsCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/reports`);
-            console.log('Reports collection path:', `artifacts/${appId}/users/${currentUserId}/reports`);
+            // Set up Firestore collection reference for the PUBLIC collection
+            reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
+            console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
 
             // Unsubscribe from previous listener if exists
             if (unsubscribeFromReports) {
@@ -490,7 +491,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Set up real-time listener for reports
-            // Use 'onSnapshot' imported from firebase.js
             unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
                 const fetchedReports = [];
                 snapshot.forEach(doc => {
@@ -510,7 +510,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 userIdDisplay.textContent = 'מצב אורח (טוען...)';
             }
             try {
-                // Use 'signInWithCustomToken' or 'signInAnonymously' imported from firebase.js
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
