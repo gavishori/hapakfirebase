@@ -4,33 +4,31 @@ let editingReportIndex = null;
 let lastAddedReportId = null; 
 let collapsedGroups = new Set(); 
 
-// Import Firebase variables and functions from firebase.js
+// --- Firebase Imports ---
 import { 
     db, 
     auth, 
-    appId, // Use the exported appId
-    initialAuthToken, // Use the exported initialAuthToken
+    appId, 
     onAuthStateChanged,
     addDoc, 
     setDoc, 
-    // deleteDoc, // deleteDoc is no longer needed as delete functionality is removed
     onSnapshot, 
     collection, 
-    doc, // Import doc specifically for doc references
-    signInAnonymously, // Ensure this is explicitly imported
-    signInWithCustomToken // Ensure this is explicitly imported
-} from './firebase.js'; // Adjust path if firebase.js is in a different folder
+    doc, 
+    signInWithEmailAndPassword, 
+    signOut 
+} from './firebase.js'; 
 
-// Import FieldValue DIRECTLY from the Firestore SDK to ensure correct serverTimestamp() access
+// Import FieldValue DIRECTLY from the Firestore SDK
 import { FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
 let currentUserId = null;
-// reportsCollectionRef will now point to the PUBLIC collection
 let reportsCollectionRef = null; 
-let unsubscribeFromReports = null; // To store the unsubscribe function for real-time listener
+let unsubscribeFromReports = null; 
 
-// Global DOM element references (initialized in DOMContentLoaded)
+
+// --- Global DOM element references ---
 let filterReporter;
 let filterLogType;
 let generalTextInput;
@@ -41,12 +39,31 @@ let mainActionBtn;
 let cancelEditBtn;
 let tableBody;
 let emptyStateRow;
-let loadingStateRow; // New loading state row
+let loadingStateRow; 
 let expandAllBtn;
 let collapseAllBtn;
 let inputErrorMessage;
-// userIdDisplay is removed as it's no longer needed in the UI
-// let userIdDisplay; 
+
+// Login Page DOM references
+let loginPage;
+let appContent;
+let loginEmailInput;
+let loginPasswordInput;
+let loginBtn;
+let loginErrorMessage;
+let logoutBtn;
+
+
+// --- UI State Management ---
+const showLoginPage = () => {
+    if (loginPage) loginPage.classList.remove('hidden');
+    if (appContent) appContent.classList.add('hidden');
+};
+
+const showAppContent = () => {
+    if (loginPage) loginPage.classList.add('hidden');
+    if (appContent) appContent.classList.remove('hidden');
+};
 
 
 // --- Auto-resize Textarea Logic ---
@@ -110,30 +127,27 @@ const renderTable = () => {
         console.error('tableBody element not found. Cannot render table.');
         return;
     }
-    tableBody.innerHTML = ''; // Clear existing table body
+    tableBody.innerHTML = ''; 
     
-    // Hide loading state
     if (loadingStateRow) {
         loadingStateRow.classList.add('hidden');
     }
 
     if (reports.length === 0) {
         if (emptyStateRow) { 
-            emptyStateRow.classList.remove('hidden'); // Show empty state
+            emptyStateRow.classList.remove('hidden'); 
             tableBody.appendChild(emptyStateRow);
         }
         console.log('No reports to display.');
         return;
     } else {
         if (emptyStateRow) {
-            emptyStateRow.classList.add('hidden'); // Hide empty state if there are reports
+            emptyStateRow.classList.add('hidden'); 
         }
     }
 
     let finalDisplayList = [...reports]; 
 
-    // Apply hybrid sorting logic:
-    // Rule 1: The last NEWLY ADDED report always at the top.
     if (lastAddedReportId) {
         const lastAddedIndex = finalDisplayList.findIndex(report => report.id === lastAddedReportId);
         if (lastAddedIndex !== -1) {
@@ -144,7 +158,6 @@ const renderTable = () => {
         }
     }
     
-    // Group reports by date for rendering
     const groupedReports = new Map();
     finalDisplayList.forEach(report => {
         const dateKey = report.date; 
@@ -154,7 +167,6 @@ const renderTable = () => {
         groupedReports.get(dateKey).push(report);
     });
 
-    // Sort the date keys for displaying date groups chronologically (descending)
     const sortedDateKeys = Array.from(groupedReports.keys()).sort((a, b) => {
         return new Date(b) - new Date(a);
     });
@@ -167,7 +179,6 @@ const renderTable = () => {
         const isToday = dateKey === todayKey;
         const isCollapsed = collapsedGroups.has(dateKey); 
 
-        // Date Header Row
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
         headerRow.innerHTML = `
@@ -180,7 +191,6 @@ const renderTable = () => {
         `;
         tableBody.appendChild(headerRow);
 
-        // Content Rows Wrapper (collapsible)
         const reportsContainerRow = document.createElement('tr');
         reportsContainerRow.className = `date-group-content ${isCollapsed ? 'hidden' : ''}`; 
         reportsContainerRow.dataset.contentDate = dateKey; 
@@ -193,8 +203,6 @@ const renderTable = () => {
         innerTable.className = 'w-full text-sm';
         const innerTbody = document.createElement('tbody');
 
-        // Render individual report rows inside the inner table
-        // Sort reports within the same date group by time (descending)
         const sortedReportsForDate = [...reportsForDate].sort((a, b) => {
             if (a.time > b.time) return -1;
             if (a.time < b.time) return 1;
@@ -212,7 +220,6 @@ const renderTable = () => {
                 <td class="table-cell">${report.logType}</td>
                 <td class="table-cell text-center whitespace-nowrap">
                     <button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>
-                    <!-- Delete button removed -->
                 </td>
             `;
             innerTbody.appendChild(reportRow);
@@ -223,19 +230,16 @@ const renderTable = () => {
         reportsContainerRow.appendChild(reportsCell);
         tableBody.appendChild(reportsContainerRow);
         
-        // Default collapse/expand logic for initial rendering
-        // Only collapse if not today AND it's not already in the collapsedGroups set
         if (!isToday && !collapsedGroups.has(dateKey)) {
-            collapsedGroups.add(dateKey); // Add to set to mark as collapsed
-            reportsContainerRow.classList.add('hidden'); // Hide the content
+            collapsedGroups.add(dateKey); 
+            reportsContainerRow.classList.add('hidden'); 
             const toggleButton = headerRow.querySelector('.toggle-day-btn');
             if (toggleButton) { 
-                toggleButton.textContent = '◀'; // Change arrow to indicate collapsed
+                toggleButton.textContent = '◀'; 
             }
         }
     });
     
-    // Re-attach event listeners for individual toggle buttons after re-rendering the table
     tableBody.querySelectorAll('.toggle-day-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const dateToToggle = e.target.dataset.toggleDate;
@@ -293,7 +297,6 @@ const resetForm = () => {
     if (newTimeInput) { 
         newTimeInput.readOnly = false; 
     }
-    // No renderTable() here, as onSnapshot will trigger it
 };
 
 // Adds a new report to Firestore
@@ -324,15 +327,15 @@ const addReport = async () => {
         time, 
         reporter, 
         logType,
-        creatorId: currentUserId, // Add the ID of the user who created the report
+        creatorId: currentUserId, 
         //createdAt: FieldValue.serverTimestamp() 
     };
 
     try {
         const docRef = await addDoc(reportsCollectionRef, newReportData);
         console.log("Document written with ID: ", docRef.id);
-        lastAddedReportId = docRef.id; // Mark this as the last added report by its Firestore ID
-        collapsedGroups.delete(newReportData.date); // Open the group for the newly added report
+        lastAddedReportId = docRef.id; 
+        collapsedGroups.delete(newReportData.date); 
         resetForm(); 
     } catch (e) {
         console.error("Error adding document: ", e);
@@ -358,7 +361,7 @@ const updateReport = async () => {
     const logType = filterLogType.value;   
 
     if (!description || !date || !time) { 
-        inputErrorMessage.textContent = 'יש למ מלא את כל השדות: תיאור, תאריך ושעה.';
+        inputErrorMessage.textContent = 'יש למלא את כל השדות: תיאור, תאריך ושעה.';
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
@@ -382,16 +385,14 @@ const updateReport = async () => {
         time,
         reporter,
         logType,
-        // creatorId and createdAt should remain the same
     };
 
     try {
-        // Use `doc` with `db` and the full path
-        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); // Path to the public collection
-        await setDoc(docRef, updatedReportData, { merge: true }); // Use merge to only update specified fields
+        const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); 
+        await setDoc(docRef, updatedReportData, { merge: true }); 
         console.log("Document updated with ID: ", reportToUpdate.id);
-        lastAddedReportId = null; // Clear last added to ensure full chronological sort is dominant now
-        collapsedGroups.delete(reportToUpdate.date); // Open the group for the updated report
+        lastAddedReportId = null; 
+        collapsedGroups.delete(reportToUpdate.date); 
         resetForm(); 
     } catch (e) {
         console.error("Error updating document: ", e);
@@ -400,9 +401,53 @@ const updateReport = async () => {
     }
 };
 
-// deleteReport function is removed
 
-// DOMContentLoaded listener - All DOM element references and initial event listeners are set here
+// --- Auth State Handler ---
+const handleAuthState = async (user) => {
+    // Hide loading state
+    if (loadingStateRow) loadingStateRow.classList.add('hidden');
+
+    if (user) {
+        currentUserId = user.uid;
+        console.log('User signed in. UID:', currentUserId);
+        console.log('User email:', user.email);
+
+        console.log('User is authenticated. Showing app content.');
+        showAppContent(); 
+
+        // Initialize reports collection reference if not already done
+        if (!reportsCollectionRef) {
+             reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
+             console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
+        }
+       
+        // Set up real-time listener for reports if not active
+        if (!unsubscribeFromReports) {
+            unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
+                const fetchedReports = [];
+                snapshot.forEach(doc => {
+                    fetchedReports.push({ id: doc.id, ...doc.data() });
+                });
+                reports = sortChronologically(fetchedReports); 
+                console.log('Reports fetched and sorted:', reports);
+                renderTable(); 
+            }, (error) => {
+                console.error("Error getting reports in real-time: ", error);
+                inputErrorMessage.textContent = 'שגיאה בטעינת דיווחים: ' + error.message;
+            });
+        }
+
+    } else {
+        console.log('No user signed in. Showing login page.');
+        showLoginPage(); 
+        reports = []; 
+        renderTable(); 
+        resetForm(); 
+    }
+};
+
+
+// --- DOMContentLoaded listener ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize global DOM element references
     filterReporter = document.getElementById('filterReporter');
@@ -415,100 +460,99 @@ document.addEventListener('DOMContentLoaded', async () => {
     cancelEditBtn = document.getElementById('cancelEditBtn');
     tableBody = document.getElementById('reportTableBody');
     emptyStateRow = document.getElementById('empty-state');
-    loadingStateRow = document.getElementById('loading-state'); // Get loading state row
+    loadingStateRow = document.getElementById('loading-state'); 
     inputErrorMessage = document.getElementById('inputErrorMessage');
     expandAllBtn = document.getElementById('expandAllBtn'); 
     collapseAllBtn = document.getElementById('collapseAllBtn'); 
-    // userIdDisplay element is removed from HTML, so no need to getElementById
-    // userIdDisplay = document.getElementById('userIdDisplay'); 
 
-    // --- Firebase Initialization (auth state listener) ---
-    // The Firebase app itself is initialized in firebase.js.
-    // Here we set up the auth state listener using the 'auth' object imported from firebase.js.
+    // Login Page DOM references
+    loginPage = document.getElementById('login-page');
+    appContent = document.getElementById('app-content');
+    loginEmailInput = document.getElementById('loginEmail');
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginBtn = document.getElementById('loginBtn');
+    loginErrorMessage = document.getElementById('loginErrorMessage');
+    logoutBtn = document.getElementById('logoutBtn');
+
+
+    // --- Firebase Initialization ---
     if (!auth || !db) {
         console.error('Firebase Auth or Firestore not initialized. Check firebase.js for errors.');
-        inputErrorMessage.textContent = 'שגיאה: Firebase לא אותחל באופן מלא.';
+        loginErrorMessage.textContent = 'שגיאה: Firebase לא אותחל באופן מלא.';
+        showLoginPage(); 
         return;
     }
 
-    // Display loading state initially
-    if (loadingStateRow) {
-        loadingStateRow.classList.remove('hidden');
-    }
-    if (emptyStateRow) {
-        emptyStateRow.classList.add('hidden');
-    }
-
-    // --- Add console logs for immediate debugging of imports ---
-    console.log('script.js: db imported?', !!db);
-    console.log('script.js: auth imported?', !!auth);
-    console.log('script.js: signInAnonymously imported?', !!signInAnonymously);
-    console.log('script.js: signInWithCustomToken imported?', !!signInWithCustomToken);
-    console.log('script.js: FieldValue imported?', !!FieldValue);
+    // Initial state: show loading then login page
+    // The handleAuthState function will be called by onAuthStateChanged listener,
+    // which then decides to show login or app content.
+    if (loadingStateRow) loadingStateRow.classList.remove('hidden'); // Ensure loading is visible immediately
+    // Removed showLoginPage() here: onAuthStateChanged will call handleAuthState which sets visibility.
 
 
-    // Listen for auth state changes using the imported onAuthStateChanged
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            currentUserId = user.uid;
-            console.log('User signed in. UID:', currentUserId);
-            // userIdDisplay removed: no need to update textContent
-            // if (userIdDisplay) {
-            //     userIdDisplay.textContent = `מחובר כ: ${currentUserId}`;
-            // }
+    // --- Set up initial data/listeners ---
+    setDefaultDateTime();
+    resetForm(); 
 
-            // Set up Firestore collection reference for the PUBLIC collection
-            reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
-            console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
 
-            // Unsubscribe from previous listener if exists
-            if (unsubscribeFromReports) {
-                unsubscribeFromReports();
+    // --- Login/Logout Event Listeners ---
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const email = loginEmailInput.value;
+            const password = loginPasswordInput.value;
+            loginErrorMessage.textContent = ''; 
+
+            if (!email || !password) {
+                loginErrorMessage.textContent = 'נא להזין אימייל וסיסמה.';
+                return;
             }
 
-            // Set up real-time listener for reports
-            unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
-                const fetchedReports = [];
-                snapshot.forEach(doc => {
-                    fetchedReports.push({ id: doc.id, ...doc.data() });
-                });
-                reports = sortChronologically(fetchedReports); // Sort data after fetching
-                console.log('Reports fetched and sorted:', reports);
-                renderTable(); // Re-render table with fetched data
-            }, (error) => {
-                console.error("Error getting reports in real-time: ", error);
-                inputErrorMessage.textContent = 'שגיאה בטעינת דיווחים: ' + error.message;
-            });
-
-        } else {
-            console.log('No user signed in. Attempting anonymous sign-in...');
-            // userIdDisplay removed: no need to update textContent
-            // if (userIdDisplay) {
-            //     userIdDisplay.textContent = 'מצב אורח (טוען...)';
-            // }
             try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth); 
-                }
+                await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
-                console.error('Error signing in:', error);
-                inputErrorMessage.textContent = 'שגיאה בהתחברות: ' + error.message;
-                // userIdDisplay removed: no need to update textContent
-                // if (userIdDisplay) {
-                //     userIdDisplay.textContent = 'מצב אורח (שגיאת התחברות)';
-                // }
-                // If sign-in fails, hide loading and show empty state
-                if (loadingStateRow) loadingStateRow.classList.add('hidden');
-                if (emptyStateRow) emptyStateRow.classList.remove('hidden');
+                console.error("Error signing in with email/password:", error);
+                let errorMessage = 'שגיאת התחברות: ';
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        errorMessage += 'אימייל או סיסמה שגויים.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage += 'פורמט אימייל שגוי.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMessage += 'נסיונות רבים מדי, נסה שוב מאוחר יותר.';
+                        break;
+                    default:
+                        errorMessage += error.message;
+                }
+                loginErrorMessage.textContent = errorMessage;
             }
-        }
-    });
+        });
+    }
 
-    // --- Attach Event Listeners (after DOM elements are initialized) ---
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+                showLoginPage(); 
+                reports = []; 
+                renderTable(); 
+                resetForm(); 
+            } catch (error) {
+                console.error("Error signing out:", error);
+                loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
+            }
+        });
+    }
 
-    // Handle the click on the main action button (Add/Update)
+    // --- Firebase Auth State Changed Listener ---
+    // This is the main orchestrator for UI and data fetching based on login status.
+    onAuthStateChanged(auth, handleAuthState);
+
+
+    // --- Attach Main App Event Listeners ---
     if (mainActionBtn) { 
         mainActionBtn.addEventListener('click', () => {
             if (editingReportIndex === null) {
@@ -521,14 +565,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('mainActionBtn element not found! Cannot attach event listener.');
     }
 
-    // Handle the click on the cancel edit button
     if (cancelEditBtn) { 
         cancelEditBtn.addEventListener('click', resetForm);
     } else {
         console.error('cancelEditBtn element not found! Cannot attach event listener.');
     }
 
-    // Attach global expand/collapse buttons listeners
     if (expandAllBtn) {
         expandAllBtn.addEventListener('click', () => {
             collapsedGroups.clear(); 
@@ -546,7 +588,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (collapseAllBtn) {
         collapseAllBtn.addEventListener('click', () => {
             collapsedGroups.clear(); 
-            // Get all unique dates currently in the reports array
             const allDateKeysInTable = Array.from(new Set(reports.map(r => r.date)));
             allDateKeysInTable.forEach(key => collapsedGroups.add(key));
 
@@ -561,10 +602,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('collapseAllBtn element not found!');
     }
 
-    // Event delegation for table actions (edit only, delete removed)
     if (tableBody) { 
         tableBody.addEventListener('click', (e) => {
-            // Edit button
             if (e.target.classList.contains('edit-btn')) {
                 const reportIdToEdit = e.target.getAttribute('data-id');
                 const index = reports.findIndex(report => report.id === reportIdToEdit);
@@ -576,7 +615,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const reportToEdit = reports[index];
                 
-                // Populate inputs with report data
                 if (generalTextInput) generalTextInput.value = reportToEdit.description;
                 if (newDateInput) newDateInput.value = reportToEdit.date;
                 if (newTimeInput) newTimeInput.value = reportToEdit.time; 
@@ -587,10 +625,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (mainActionBtn) mainActionBtn.textContent = 'עדכן דיווח'; 
                 if (cancelEditBtn) cancelEditBtn.classList.remove('hidden'); 
                 
-                // SHOW date and time inputs when editing
                 if (dateTimeInputsWrapper) dateTimeInputsWrapper.classList.remove('hidden'); 
 
-                // Set textarea to fixed height for edit mode
                 if (generalTextInput) {
                     generalTextInput.rows = 5; 
                     generalTextInput.style.height = 'auto'; 
@@ -602,15 +638,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (generalTextInput) generalTextInput.focus(); 
             }
-            // Delete button logic removed
         });
     } else {
         console.error('tableBody element not found! Cannot attach event delegation for edit.');
     }
 
-    // Initialize default date and time
+    // Initialize default date and time, and reset form
     setDefaultDateTime();
-    // resetForm() is called initially, but renderTable is now driven by onSnapshot
-    // resetForm() will ensure inputs are clear after initialization
     resetForm(); 
 });

@@ -19,6 +19,10 @@ body {
 .form-input, .form-select, .form-textarea {
     border-color: #DCD5CC;
     transition: all 0.3s ease;
+    /* Ensure a sensible default min-height for textarea */
+    min-height: calc(1.5em * 3 + 1rem); /* Roughly 3 lines height + padding for default rows="3" */
+    overflow-y: hidden; /* Important for auto-resize */
+    border-radius: 0.5rem; /* rounded-lg equivalent for default form inputs */
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
     border-color: #B8A692;
@@ -29,6 +33,7 @@ body {
     background-color: #8C7A6B;
     color: #FFFFFF;
     transition: background-color 0.3s ease;
+    border-radius: 0.5rem; /* rounded-lg equivalent */
 }
 .btn-primary:hover {
     background-color: #736357;
@@ -37,13 +42,14 @@ body {
     background-color: #EAE2D9;
     color: #6D5F53;
     transition: background-color 0.3s ease;
+    border-radius: 0.5rem; /* rounded-lg equivalent */
 }
 .btn-secondary:hover {
     background-color: #DCD5CC;
 }
-/* Fixed height for textarea in edit mode */
+/* Refined edit-mode styling for textarea: ensures a minimum height and allows manual resize */
 .form-textarea.edit-mode-fixed-height {
-    height: auto !important; /* Override auto-sizing */
-    min-height: calc(1.5em * 5 + 1rem); /* 5 lines height roughly (line-height * rows + padding) */
-    resize: vertical; /* Allow manual resize if desired */
+    min-height: calc(1.5em * 5 + 1rem); /* Ensure a minimum height for edit mode, matching rows="5" */
+    resize: vertical; /* Allow manual vertical resize */
+    /* REMOVED height: auto !important; to prevent conflict with JS dynamic sizing */
 }

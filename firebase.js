@@ -4,7 +4,10 @@ import {
     getAuth, 
     signInAnonymously, 
     signInWithCustomToken, 
-    onAuthStateChanged 
+    onAuthStateChanged,
+    signInWithEmailAndPassword, // Added this export
+    createUserWithEmailAndPassword, // Added this export
+    signOut // Added this export
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -21,7 +24,6 @@ import {
     orderBy, 
     getDocs, 
     // FieldValue is NOT imported or re-exported from here.
-    // It should be imported directly in script.js where it's used.
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // IMPORTANT: For local VS Code development, hardcode your Firebase config here.
@@ -36,10 +38,7 @@ const firebaseConfig = {
 };
 
 // For local VS Code development, provide fallback/dummy values for Canvas-specific globals
-// In Canvas, __app_id is injected, but locally we use a dummy string.
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-vs-code-app-id'; 
-// In Canvas, __initial_auth_token is injected for custom auth.
-// Locally, we'll let signInAnonymously handle auth if no token is present.
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
 
 let app;
@@ -47,7 +46,7 @@ let db;
 let auth;
 
 // Initialize Firebase App and services
-if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Basic check for valid config
+if (firebaseConfig.apiKey && firebaseConfig.projectId) { 
     try {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
@@ -55,10 +54,8 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Basic check for vali
         console.log('Firebase initialized successfully from firebase.js');
     } catch (e) {
         console.error('Failed to initialize Firebase from firebase.js:', e);
-        // You might want to display an error to the user via a global error message div
     }
 } else {
-    // This warning is important if firebaseConfig is not properly set
     console.warn('Firebase config missing or incomplete in firebase.js. Firebase functionality will be limited.');
 }
 
@@ -70,10 +67,13 @@ export {
     appId, // Export appId for use in constructing collection paths
     initialAuthToken, // Export initialAuthToken for auth logic
     
-    // Auth functions
+    // Auth functions - these must be exported from firebase.js
     onAuthStateChanged,
     signInAnonymously,
     signInWithCustomToken,
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    signOut, 
 
     // Firestore functions
     doc,
@@ -86,7 +86,7 @@ export {
     collection,
     query,
     where,
-    orderBy, // Note: orderBy can cause errors if indices aren't configured in Firestore
+    orderBy, 
     getDocs,
     // FieldValue is explicitly NOT exported from here.
 };

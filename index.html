@@ -6,19 +6,48 @@
     <title>יומן חפ"ק - לפיד</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Assistant', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Warm Neutrals -->
 </head>
-<body class="bg-[#FDFBF7] text-[#4A443E]">
+<body class="bg-[#FDFBF7] text-[#4A443E] flex items-center justify-center min-h-screen">
 
-    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl">
+    <!-- Login Page (Initially visible) -->
+    <div id="login-page" class="w-full max-w-md bg-white rounded-xl shadow-lg p-8 ring-1 ring-[#EAE2D9]">
+        <h2 class="text-3xl font-bold text-[#6D5F53] text-center mb-6">התחברות ליומן חפ"ק</h2>
+        <div class="mb-4">
+            <label for="loginEmail" class="block text-sm font-semibold text-[#6D5F53] mb-1">אימייל:</label>
+            <input type="email" id="loginEmail" class="form-input w-full p-2.5 border rounded-lg" placeholder="your@example.com">
+        </div>
+        <div class="mb-6">
+            <label for="loginPassword" class="block text-sm font-semibold text-[#6D5F53] mb-1">סיסמה:</label>
+            <input type="password" id="loginPassword" class="form-input w-full p-2.5 border rounded-lg" placeholder="******">
+        </div>
+        <div id="loginErrorMessage" class="text-red-500 text-center mb-4 h-5"></div>
+        <button id="loginBtn" class="btn-primary font-bold py-2.5 px-6 rounded-lg shadow w-full">התחבר</button>
+        <!-- Optional: A button for initial registration (for testing) -->
+        <!-- <button id="registerBtn" class="btn-secondary font-bold py-2.5 px-6 rounded-lg shadow w-full mt-3">הרשמה (למפתחים בלבד)</button> -->
+    </div>
 
-        <header class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53]">יומן חפ"ק - לפיד</h1>
-            <!-- User ID display removed -->
+    <!-- Main Application Content (Initially hidden) -->
+    <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl hidden">
+
+        <header class="text-center mb-6 flex justify-between items-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
+            <button id="logoutBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">התנתק</button>
         </header>
 
         <main class="bg-white rounded-xl shadow-lg p-6 ring-1 ring-[#EAE2D9]">
@@ -108,3 +137,4 @@
     <script src="script.js" defer type="module"></script>
 </body>
 </html>
+
