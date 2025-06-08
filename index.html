@@ -25,42 +25,49 @@
 </head>
 <body class="bg-[#FDFBF7] text-[#4A443E] flex items-center justify-center min-h-screen">
 
-    <!-- Login Page (Initially visible) -->
-    <div id="login-page" class="w-full max-w-md bg-white rounded-xl shadow-lg p-8 ring-1 ring-[#EAE2D9]">
-        <h2 class="text-3xl font-bold text-[#6D5F53] text-center mb-6">התחברות ליומן חפ"ק</h2>
-        <div class="mb-4">
-            <label for="loginEmail" class="block text-sm font-semibold text-[#6D5F53] mb-1">אימייל:</label>
-            <input type="email" id="loginEmail" class="form-input w-full p-2.5 border rounded-lg" placeholder="your@example.com">
-        </div>
-        <div class="mb-6">
-            <label for="loginPassword" class="block text-sm font-semibold text-[#6D5F53] mb-1">סיסמה:</label>
-            <input type="password" id="loginPassword" class="form-input w-full p-2.5 border rounded-lg" placeholder="******">
-        </div>
-        <div id="loginErrorMessage" class="text-red-500 text-center mb-4 h-5"></div>
-        <button id="loginBtn" class="btn-primary font-bold py-2.5 px-6 rounded-lg shadow w-full">התחבר</button>
-        <!-- Optional: A button for initial registration (for testing) -->
-        <!-- <button id="registerBtn" class="btn-secondary font-bold py-2.5 px-6 rounded-lg shadow w-full mt-3">הרשמה (למפתחים בלבד)</button> -->
-    </div>
-
     <!-- Main Application Content (Initially hidden) -->
-    <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl hidden">
+    <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl"> <!-- Removed 'hidden' class to make it visible by default -->
 
-        <header class="text-center mb-6 flex justify-between items-center">
+        <header class="text-center mb-6 flex justify-between items-center flex-wrap gap-2">
             <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
-            <button id="logoutBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">התנתק</button>
+            <div class="flex gap-2 items-center">
+                <button id="searchLogBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm whitespace-nowrap">חיפוש ביומן</button>
+                <input type="text" id="searchInput" class="form-input p-1.5 border rounded-lg text-sm hidden w-32" placeholder="חפש...">
+                <button id="exportExcelBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm whitespace-nowrap">ייצא לאקסל</button>
+                <button id="logoutBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm whitespace-nowrap">התנתק</button>
+            </div>
         </header>
+
+        <!-- Clocks Section -->
+        <section class="flex flex-col md:flex-row gap-6 mb-6">
+            <!-- Current Time Clock -->
+            <div class="clock-container flex-1">
+                <div class="clock-label">שעה נוכחית</div>
+                <div id="currentTimeDisplay" class="clock-display">00:00:00</div>
+            </div>
+
+            <!-- Situation Assessment Clock -->
+            <div class="clock-container flex-1">
+                <div class="clock-label">הערכת מצב</div>
+                <div class="flex items-center justify-center gap-4"> 
+                    <button id="assessmentTimeMinusBtn" class="clock-button">-</button> <!-- MINUS on the left -->
+                    <div id="assessmentTimeDisplay" class="clock-display">00:00</div> 
+                    <button id="assessmentTimePlusBtn" class="clock-button">+</button> <!-- PLUS on the right -->
+                </div>
+            </div>
+        </section>
 
         <main class="bg-white rounded-xl shadow-lg p-6 ring-1 ring-[#EAE2D9]">
             <div class="controls-section mb-6 pb-6 border-b border-[#EAE2D9]">
                 
                 <div class="max-w-full mx-auto mb-6 p-4 bg-[#F8F5F1] rounded-lg shadow-inner">
-                    <div class="flex flex-col sm:flex-row items-end gap-4">
-                        <div class="flex-grow-[5] w-full sm:w-auto min-w-0">
+                    <div class="flex flex-col sm:flex-row items-end gap-4"> 
+                        <div class="flex-grow-[5] w-full sm:w-auto min-w-0 form-input-group">
                             <label for="generalTextInput" class="block mb-1 text-sm font-semibold text-[#6D5F53]">תיאור דיווח:</label>
-                            <textarea id="generalTextInput" class="form-textarea w-full p-2 border rounded-md" rows="3" placeholder="פרטי דיווח קצרים..."></textarea>
+                            <textarea id="generalTextInput" class="form-textarea w-full p-2 border rounded-md form-textarea-aligned" rows="3" placeholder="פרטי דיווח קצרים..."></textarea>
                         </div>
                         
-                        <div class="flex-shrink-0 w-full sm:w-auto"> <label for="filterReporter" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">מדווח:</label>
+                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterReporter" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">מדווח:</label>
                             <select id="filterReporter" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
                                 <option value="אורי">אורי</option>
                                 <option value="שונית">שונית</option>
@@ -68,7 +75,7 @@
                             </select>
                         </div>
                         
-                        <div class="flex-shrink-0 w-full sm:w-auto"> <label for="filterLogType" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">שיוך:</label>
+                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterLogType" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">שיוך:</label>
                             <select id="filterLogType" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
                                 <option value="שגרה">שגרה</option>
                                 <option value="שריפה">שריפה</option>
@@ -134,7 +141,6 @@
     <script type="module" src="firebase.js"></script>
     
     <!-- Custom JavaScript -->
-    <script src="script.js" defer type="module"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
-
