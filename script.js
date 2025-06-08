@@ -21,6 +21,10 @@ import {
     signOut,
     deleteDoc, 
     initialAuthToken, 
+    getDocs, 
+    query, 
+    where,
+    writeBatch // Import writeBatch for efficient default reporter addition
 } from './firebase.js'; 
 
 // Firestore collection references
@@ -64,13 +68,13 @@ let loginErrorMessage;
 let logoutBtn;
 
 // Header Menu & Buttons
-let menuToggleBtn; // New for hamburger menu
-let headerMenu;     // New for dropdown menu
+let menuToggleBtn; 
+let headerMenu;     
 let searchLogBtn;   
 let searchInput;    
 let exportExcelBtn; 
 let editReportersBtn; 
-let tasksButton;    // New dedicated tasks button
+let tasksButtonFixed; // Renamed to tasksButtonFixed for the permanent button
 
 // Clock DOM references
 let currentTimeDisplay;
@@ -80,7 +84,7 @@ let assessmentTimeMinusBtn;
 
 // Clock state variables
 let assessmentTime = new Date(); 
-let assessmentTimeIsManual = false; // Flag to indicate if assessment time was manually set
+let assessmentTimeIsManual = false; 
 
 // Tasks Panel DOM references
 let tasksPanel;
@@ -102,11 +106,19 @@ let customAlert;
 let customAlertMessage;
 let customAlertCloseBtn;
 
+// Global state for tasks panel hover
+let tasksPanelHoverTimeout;
+const PANEL_OPEN_DELAY = 100; // Small delay before opening on hover
+const PANEL_CLOSE_DELAY = 200; // Delay before closing on mouse leave
+
 
 // --- UI State Management ---
 const showLoginPage = () => {
     if (loginPage) loginPage.classList.remove('hidden');
-    if (appContent) appContent.classList.add('hidden');
+    if (appContent) {
+        appContent.classList.add('hidden');
+        appContent.classList.remove('app-content-shifted'); // Ensure no shift when hidden
+    }
     // Hide tasks panel and reporters modal on logout
     if (tasksPanel) tasksPanel.classList.remove('is-open');
     if (reportersModal) reportersModal.classList.add('hidden');
@@ -265,7 +277,7 @@ const renderTable = (searchTerm = '') => {
         // Colspan for group header: 6 columns on desktop, 3 on mobile
         const headerColspan = window.innerWidth <= 639 ? 3 : 6;
 
-        // Date group header should only display date (Point 1)
+        // Date group header should only display date 
         headerRow.innerHTML = `
             <td colspan="${headerColspan}" class="p-3 font-bold text-[#6D5F53] text-right">
                 <button class="toggle-day-btn text-blue-600 hover:text-blue-800 ml-2" data-toggle-date="${dateKey}">
@@ -594,6 +606,10 @@ const handleAuthState = async (user) => {
                 });
                 populateReportersDropdown(fetchedReporters);
                 renderReportersInModal(fetchedReporters);
+                // Add default reporters if the collection is empty AND it's a new user/first load
+                if (snapshot.empty && !localStorage.getItem('defaultReportersAdded')) {
+                    addDefaultReportersIfEmpty();
+                }
             }, (error) => {
                 console.error("Error getting reporters in real-time: ", error);
             });
@@ -821,6 +837,7 @@ const addReporterToFirestore = async (name) => {
     }
 
     try {
+        // Use a simple addDoc as long as permissions are correctly set
         await addDoc(reportersCollectionRef, { name: name.trim() });
         console.log(`Reporter "${name}" added.`);
         if (newReporterNameInput) newReporterNameInput.value = '';
@@ -848,6 +865,29 @@ const deleteReporterFromFirestore = async (name) => {
     } catch (e) {
         console.error("Error deleting reporter: ", e);
         if (reporterErrorMessage) reporterErrorMessage.textContent = 'שגיאה במחיקת מדווח: ' + e.message;
+    }
+};
+
+// --- Default Reporters Logic ---
+const addDefaultReportersIfEmpty = async () => {
+    try {
+        const snapshot = await getDocs(reportersCollectionRef);
+        if (snapshot.empty) {
+            console.log("Reporters collection is empty. Adding default reporters.");
+            const defaultReporters = ["אורי", "שונית", "חיליק"];
+            const batch = writeBatch(db); // Use writeBatch for efficient multiple writes
+            for (const reporterName of defaultReporters) {
+                const newDocRef = doc(reportersCollectionRef); // Create a new document reference with an auto-generated ID
+                batch.set(newDocRef, { name: reporterName });
+            }
+            await batch.commit();
+            console.log("Default reporters added successfully.");
+            localStorage.setItem('defaultReportersAdded', 'true'); // Set flag to prevent re-adding on subsequent loads
+        } else {
+            console.log("Reporters collection is not empty, skipping default reporter addition.");
+        }
+    } catch (e) {
+        console.error("Error checking or adding default reporters:", e);
     }
 };
 
@@ -884,35 +924,38 @@ const orderOfOperations = {
     ],
 };
 
-const toggleTasksPanel = (open) => { // Removed logType from here, handled in renderTasksPanel
-    if (tasksPanel) {
+// Controls the tasks panel visibility and main content shifting
+const toggleTasksPanel = (open) => { 
+    if (tasksPanel && appContent) {
         if (open) {
             tasksPanel.classList.add('is-open');
+            appContent.classList.add('app-content-shifted');
         } else {
             tasksPanel.classList.remove('is-open');
+            appContent.classList.remove('app-content-shifted');
         }
     }
 };
 
 // Function to update the "משימות" button's color based on completion status of the selected log type
 const updateTasksButtonState = (logType) => {
-    if (!tasksButton) return;
+    if (!tasksButtonFixed) return; // Use tasksButtonFixed for the permanent button
 
     if (!logType || logType === '') {
-        tasksButton.classList.remove('btn-tasks-completed');
-        tasksButton.classList.remove('btn-tasks'); // Remove red/green classes
-        tasksButton.classList.add('btn-secondary'); // Make it grey/default
-        tasksButton.disabled = true;
+        tasksButtonFixed.classList.remove('completed-tasks');
+        tasksButtonFixed.classList.remove('btn-tasks'); // Remove red/green classes
+        tasksButtonFixed.classList.add('btn-secondary'); // Make it grey/default
+        // tasksButtonFixed.disabled = true; // Button is always enabled to allow opening empty panel
         return;
     } else {
-        tasksButton.classList.remove('btn-secondary'); // Remove grey/default
-        tasksButton.disabled = false;
+        tasksButtonFixed.classList.remove('btn-secondary'); // Remove grey/default
+        // tasksButtonFixed.disabled = false;
     }
 
     const tasksForType = orderOfOperations[logType] || [];
     if (tasksForType.length === 0) {
-        tasksButton.classList.add('btn-tasks-completed'); // Green if no tasks defined
-        tasksButton.classList.remove('btn-tasks'); // Ensure no red class
+        tasksButtonFixed.classList.add('completed-tasks'); // Green if no tasks defined
+        tasksButtonFixed.classList.remove('btn-tasks'); // Ensure no red class
         return;
     }
 
@@ -926,11 +969,11 @@ const updateTasksButtonState = (logType) => {
     }
 
     if (selectedLogTypeTasksCompleted) {
-        tasksButton.classList.add('btn-tasks-completed'); // Green
-        tasksButton.classList.remove('btn-tasks'); // Ensure no red class
+        tasksButtonFixed.classList.add('completed-tasks'); // Green
+        tasksButtonFixed.classList.remove('btn-tasks'); // Ensure no red class
     } else {
-        tasksButton.classList.remove('btn-tasks-completed'); // Red
-        tasksButton.classList.add('btn-tasks'); // Ensure red class
+        tasksButtonFixed.classList.remove('completed-tasks'); // Red
+        tasksButtonFixed.classList.add('btn-tasks'); // Ensure red class
     }
 };
 
@@ -1081,7 +1124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     searchInput = document.getElementById('searchInput');       
     exportExcelBtn = document.getElementById('exportExcelBtn'); 
     editReportersBtn = document.getElementById('editReportersBtn'); 
-    tasksButton = document.getElementById('tasksButton');
+    tasksButtonFixed = document.getElementById('tasksButtonFixed'); // Changed from tasksButton
 
     // Clock DOM references
     currentTimeDisplay = document.getElementById('currentTimeDisplay');
@@ -1204,6 +1247,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.error("Error signing out:", error);
                 loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
             }
+            headerMenu.classList.add('hidden'); // Close menu on logout
+            headerMenu.classList.remove('open');
         });
     }
 
@@ -1339,9 +1384,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Header Menu Event Listeners ---
     if (menuToggleBtn) {
-        menuToggleBtn.addEventListener('click', () => {
+        menuToggleBtn.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent document click from immediately closing
             headerMenu.classList.toggle('hidden');
             headerMenu.classList.toggle('open'); // For transition animation
+            if (!headerMenu.classList.contains('hidden') && searchInput) {
+                searchInput.classList.add('hidden'); // Ensure search input is hidden by default in menu
+                isSearchInputVisible = false;
+            }
         });
         // Close menu if clicked outside
         document.addEventListener('click', (event) => {
@@ -1353,16 +1403,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (searchLogBtn) {
-        searchLogBtn.addEventListener('click', () => {
-            toggleSearchInput();
-            headerMenu.classList.add('hidden'); // Close menu after selection
-            headerMenu.classList.remove('open');
+        searchLogBtn.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent menu from closing on search button click
+            if (searchInput) {
+                searchInput.classList.toggle('hidden');
+                isSearchInputVisible = !searchInput.classList.contains('hidden');
+                if (isSearchInputVisible) {
+                    searchInput.focus();
+                } else {
+                    searchInput.value = '';
+                    performSearch(); // Re-render table if search is hidden and cleared
+                }
+            }
         });
     }
-    if (searchInput) {
-        searchInput.addEventListener('input', performSearch); 
-    }
 
+    // Existing exportExcelBtn and editReportersBtn listeners remain, but will close the header menu
     if (exportExcelBtn) {
         exportExcelBtn.addEventListener('click', () => {
             exportReportsToExcel();
@@ -1371,7 +1427,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Reporters Management Event Listeners ---
     if (editReportersBtn) {
         editReportersBtn.addEventListener('click', () => {
             openReportersModal();
@@ -1379,58 +1434,82 @@ document.addEventListener('DOMContentLoaded', async () => {
             headerMenu.classList.remove('open');
         });
     }
-    if (closeReportersModalBtn) {
-        closeReportersModalBtn.addEventListener('click', closeReportersModal);
-    }
-    if (addReporterBtn) {
-        addReporterBtn.addEventListener('click', () => {
-            if (newReporterNameInput) {
-                addReporterToFirestore(newReporterNameInput.value);
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+                showLoginPage(); 
+                reports = []; 
+                renderTable(); 
+                resetForm(); 
+                // Hide and clear search input on logout
+                if (searchInput) searchInput.classList.add('hidden'); 
+                if (searchInput) searchInput.value = ''; 
+                isSearchInputVisible = false;
+            } catch (error) {
+                console.error("Error signing out:", error);
+                loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
             }
-        });
-    }
-    // Listen for Enter key in newReporterNameInput
-    if (newReporterNameInput) {
-        newReporterNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                addReporterBtn.click();
-            }
+            headerMenu.classList.add('hidden'); // Close menu on logout
+            headerMenu.classList.remove('open');
         });
     }
 
-    // --- Tasks Panel Event Listeners ---
+
+    // --- Tasks Panel Event Listeners (controlled by fixed button hover) ---
+    if (tasksButtonFixed) {
+        // Add tasks-button-fixed class (already in HTML, but ensuring it's used)
+        // tasksButtonFixed.classList.add('tasks-button-fixed'); // Already in HTML
+
+        // Add hover listeners to the button
+        tasksButtonFixed.addEventListener('mouseenter', () => {
+            clearTimeout(tasksPanelHoverTimeout);
+            tasksPanelHoverTimeout = setTimeout(() => {
+                const selectedLogType = filterLogType.value;
+                if (selectedLogType) { // Open panel even if no tasks are defined for the type
+                    renderTasksPanel(selectedLogType);
+                    toggleTasksPanel(true);
+                } else {
+                    // Do not show alert, just don't open the panel
+                    console.log("No log type selected for tasks. Panel not opened.");
+                }
+            }, PANEL_OPEN_DELAY);
+        });
+        tasksButtonFixed.addEventListener('mouseleave', () => {
+            clearTimeout(tasksPanelHoverTimeout);
+            tasksPanelHoverTimeout = setTimeout(() => toggleTasksPanel(false), PANEL_CLOSE_DELAY);
+        });
+    }
+
+    if (tasksPanel) {
+        // Add hover listeners to the panel itself to keep it open
+        tasksPanel.addEventListener('mouseenter', () => {
+            clearTimeout(tasksPanelHoverTimeout); // Keep panel open
+        });
+        tasksPanel.addEventListener('mouseleave', () => {
+            clearTimeout(tasksPanelHoverTimeout);
+            tasksPanelHoverTimeout = setTimeout(() => toggleTasksPanel(false), PANEL_CLOSE_DELAY);
+        });
+
+        // Close button inside panel
+        if (closeTasksPanelBtn) {
+            closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
+        }
+    }
+
+    // When logType changes, render tasks panel but don't open it automatically.
+    // Instead, update the tasks button state immediately.
     if (filterLogType) {
         filterLogType.addEventListener('change', (e) => {
             const selectedLogType = e.target.value;
-            // Only open panel if a log type is selected and it has tasks
-            if (selectedLogType && orderOfOperations[selectedLogType] && orderOfOperations[selectedLogType].length > 0) {
-                renderTasksPanel(selectedLogType);
-                toggleTasksPanel(true);
-            } else {
-                toggleTasksPanel(false); // Hide if no log type selected or no tasks for selected type
-            }
-            updateTasksButtonState(selectedLogType); // Always update button state
+            updateTasksButtonState(selectedLogType);
+            // Close the panel if log type changes
+            toggleTasksPanel(false); 
         });
     }
-    if (closeTasksPanelBtn) {
-        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
-    }
-    // New tasks button listener
-    if (tasksButton) {
-        tasksButton.addEventListener('click', () => {
-            // Only allow opening if a log type is selected
-            const selectedLogType = filterLogType.value;
-            if (selectedLogType && orderOfOperations[selectedLogType] && orderOfOperations[selectedLogType].length > 0) {
-                renderTasksPanel(selectedLogType);
-                toggleTasksPanel(true);
-            } else if (selectedLogType) {
-                showCustomAlert(`אין משימות מוגדרות עבור "${selectedLogType}".`);
-            } else {
-                showCustomAlert("יש לבחור שיוך יומן כדי לראות משימות.");
-            }
-        });
-    }
-
+    
     // --- Custom Alert Event Listener ---
     if (customAlertCloseBtn) {
         customAlertCloseBtn.addEventListener('click', () => {
