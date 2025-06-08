@@ -130,3 +130,137 @@ body {
         height: 5.5rem; /* Approximate height of two selects + labels + margins */
     }
 }
+
+/* --- New Styles for Mobile Responsiveness and Tasks Panel --- */
+
+/* Hide columns on mobile for better readability */
+@media (max-width: 639px) { /* Targets screens smaller than 640px */
+    .table-cell-desktop-only {
+        display: none;
+    }
+    /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
+    #reportTableBody #empty-state td,
+    #reportTableBody #loading-state td {
+        colspan: 3;
+    }
+    .table-cell-mobile-only {
+        display: table-cell; /* Ensure this is visible on mobile */
+    }
+}
+
+/* Ensure mobile-only cells are hidden on desktop */
+@media (min-width: 640px) {
+    .table-cell-mobile-only {
+        display: none;
+    }
+    .table-cell-desktop-only {
+        display: table-cell; /* Ensure these are visible on desktop */
+    }
+    /* Reset colspan for desktop (6 visible columns) */
+    #reportTableBody #empty-state td,
+    #reportTableBody #loading-state td {
+        colspan: 6;
+    }
+}
+
+
+/* Tasks Panel Styling */
+.tasks-panel {
+    width: 250px; /* Default width */
+    max-width: 90%; /* Max width on smaller screens */
+    background-color: #F8F5F1;
+    border-right: 1px solid #DCD5CC;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    transform: translateX(-100%); /* Start off-screen */
+}
+.tasks-panel.is-open {
+    transform: translateX(0); /* Slide in */
+}
+@media (min-width: 768px) { /* md breakpoint and up */
+    .tasks-panel {
+        width: 300px; /* Wider on desktop */
+    }
+}
+
+.task-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: #FFFFFF;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: background-color 0.2s ease;
+}
+.task-item:hover {
+    background-color: #EAE2D9;
+}
+.task-item.highlight-completed {
+    background-color: #DCD5CC; /* Gray background */
+    color: #6D5F53;
+    text-decoration: line-through; /* Strikethrough */
+}
+.task-item input[type="checkbox"] {
+    margin-right: 0.75rem; /* Space between checkbox and text */
+    min-width: 1.25rem; /* Ensure checkbox is not too small */
+    min-height: 1.25rem;
+    cursor: pointer;
+}
+
+/* Reporters Modal Styling */
+#reportersModal .reporters-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+}
+#reportersModal .reporters-list-item:hover {
+    background-color: #EAE2D9;
+}
+#reportersModal .reporters-list-item button {
+    background-color: #ef4444; /* red-500 */
+    color: white;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.375rem; /* rounded-md */
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+#reportersModal .reporters-list-item button:hover {
+    background-color: #dc2626; /* red-600 */
+}
+
+/* Custom Alert Modal */
+#customAlert > div {
+    border-radius: 0.75rem; /* rounded-xl */
+}
+
+/* Header Buttons Styling (including new Tasks button) */
+.btn-tasks {
+    background-color: #ef4444; /* red-500 */
+    color: #FFFFFF;
+    transition: background-color 0.3s ease;
+    border-radius: 0.5rem;
+    font-weight: 700;
+}
+.btn-tasks:hover {
+    background-color: #dc2626; /* red-600 */
+}
+.btn-tasks.completed-tasks {
+    background-color: #22c55e; /* green-500 */
+}
+.btn-tasks.completed-tasks:hover {
+    background-color: #16a34a; /* green-600 */
+}
+
+/* Header Menu Styling */
+#headerMenu {
+    top: 100%; /* Position below the toggle button */
+    right: 0; /* Align to the right of its parent (flex item) */
+    min-width: 150px; /* Adjust as needed */
+}
+#headerMenu.open {
+    display: block;
+    transform: scale(1) translate(0, 0); /* Ensure correct animation */
+    opacity: 1;
+}
