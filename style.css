@@ -1,6 +1,7 @@
 body {
     font-family: 'Assistant', sans-serif;
     background-color: #FDFBF7;
+    overflow-x: hidden; /* Prevent horizontal scroll when panel shifts content */
 }
 .table-cell {
     padding: 12px 16px;
@@ -166,21 +167,39 @@ body {
 
 /* Tasks Panel Styling */
 .tasks-panel {
+    position: fixed;
+    left: 0; /* Aligned to the left edge */
+    top: 0;
+    height: 100%;
     width: 250px; /* Default width */
     max-width: 90%; /* Max width on smaller screens */
     background-color: #F8F5F1;
     border-right: 1px solid #DCD5CC;
     box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-    transform: translateX(-100%); /* Start off-screen */
+    transform: translateX(-100%); /* Start off-screen to the left */
+    transition: transform 0.3s ease-out; /* Smooth transition */
+    z-index: 45; /* Below the button but above main content */
+    padding: 1rem; /* Adjusted padding */
 }
 .tasks-panel.is-open {
-    transform: translateX(0); /* Slide in */
+    transform: translateX(0); /* Slide in to be fully visible */
+}
+
+/* Main content shifting when tasks panel is open */
+#app-content.app-content-shifted {
+    transform: translateX(250px); /* Push app-content to the right by panel's width */
+    /* Add a transition to app-content for smooth movement */
+    transition: transform 0.3s ease-out;
 }
 @media (min-width: 768px) { /* md breakpoint and up */
     .tasks-panel {
         width: 300px; /* Wider on desktop */
     }
+    #app-content.app-content-shifted {
+        transform: translateX(300px); /* Adjust shift for wider panel */
+    }
 }
+
 
 .task-item {
     display: flex;
@@ -263,4 +282,23 @@ body {
     display: block;
     transform: scale(1) translate(0, 0); /* Ensure correct animation */
     opacity: 1;
+}
+
+/* Specific styling for the fixed tasks button */
+.tasks-button-fixed {
+    position: fixed;
+    left: 0; /* Align to the left edge */
+    top: 50%; /* Vertically center */
+    transform: translateY(-50%); /* Adjust for vertical centering */
+    z-index: 50; /* Ensure it's above other content */
+    padding: 0.75rem 0.5rem; /* Adjust padding for a smaller, vertical look */
+    border-top-right-radius: 0.5rem; /* rounded on right side */
+    border-bottom-right-radius: 0.5rem; /* rounded on right side */
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    writing-mode: vertical-rl; /* Rotate text for vertical display */
+    text-orientation: mixed; /* Ensure text orientation is correct */
+    display: flex; /* Use flex to center text vertically after rotation */
+    align-items: center; /* Center items vertically */
+    justify-content: center; /* Center items horizontally */
 }
