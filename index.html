@@ -24,7 +24,8 @@
     <!-- Font Awesome for hamburger icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body class="bg-[#FDFBF7] text-[#4A443E] flex items-center justify-center min-h-screen">
+<body class="bg-[#FDFBF7] text-[#4A443E] flex items-center justify-center min-h-screen overflow-hidden">
+    <!-- overflow-hidden to prevent scrollbars during panel transition -->
 
     <!-- Login Page (hidden by default) -->
     <div id="login-page" class="absolute inset-0 bg-[#FDFBF7] flex items-center justify-center z-50 hidden">
@@ -43,16 +44,28 @@
         </div>
     </div>
 
+    <!-- Tasks Panel (fixed, slides from left, controlled by hover) -->
+    <div id="tasksPanel" class="tasks-panel fixed top-0 left-0 h-full bg-[#F8F5F1] shadow-xl p-4 z-40 transition-transform duration-300 ease-out transform -translate-x-full overflow-y-auto w-64 md:w-80">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-[#6D5F53]">משימות עבור <span id="tasksLogTypeDisplay"></span></h3>
+            <button id="closeTasksPanelBtn" class="text-xl font-bold text-[#6D5F53] hover:text-[#4A443E]">&times;</button>
+        </div>
+        <div id="tasksList" class="space-y-3">
+            <!-- Tasks will be rendered here -->
+        </div>
+        <p id="allTasksCompletedMessage" class="text-green-600 text-center mt-6 font-semibold hidden">כל המשימות הושלמו!</p>
+    </div>
+
     <!-- Main Application Content (visible by default) -->
-    <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl"> 
+    <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl transition-transform duration-300 ease-out"> 
 
         <header class="text-center mb-6 flex justify-between items-center flex-wrap gap-2">
             <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
             <div class="flex gap-2 items-center relative">
-                <button id="tasksButton" class="btn-tasks py-1.5 px-4 rounded-lg shadow text-sm whitespace-nowrap ml-2">משימות</button>
+                <!-- Hamburger Menu Toggle Button -->
                 <button id="menuToggleBtn" class="btn-secondary font-bold py-1.5 px-3 rounded-lg shadow text-xl"><i class="fas fa-bars"></i></button>
                 <!-- Dropdown Menu -->
-                <div id="headerMenu" class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden origin-top-right transform scale-95 opacity-0 transition-all duration-200 ease-out"
+                <div id="headerMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden origin-top-right transform scale-95 opacity-0 transition-all duration-200 ease-out"
                      role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
                     <button id="searchLogBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">חיפוש ביומן</button>
                     <input type="text" id="searchInput" class="form-input p-1.5 border rounded-lg text-sm w-full px-4 py-2 mt-1 hidden" placeholder="חפש...">
@@ -162,17 +175,8 @@
 
     </div>
 
-    <!-- Tasks Panel (initially hidden, slides from left) -->
-    <div id="tasksPanel" class="tasks-panel fixed top-0 left-0 h-full bg-[#F8F5F1] shadow-xl p-4 z-40 transition-transform duration-300 transform -translate-x-full overflow-y-auto w-64 md:w-80">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-[#6D5F53]">משימות עבור <span id="tasksLogTypeDisplay"></span></h3>
-            <button id="closeTasksPanelBtn" class="text-xl font-bold text-[#6D5F53] hover:text-[#4A443E]">&times;</button>
-        </div>
-        <div id="tasksList" class="space-y-3">
-            <!-- Tasks will be rendered here -->
-        </div>
-        <p id="allTasksCompletedMessage" class="text-green-600 text-center mt-6 font-semibold hidden">כל המשימות הושלמו!</p>
-    </div>
+    <!-- Fixed Tasks Button (always visible on the left) -->
+    <button id="tasksButtonFixed" class="btn-tasks tasks-button-fixed py-1.5 px-4 rounded-lg shadow text-sm whitespace-nowrap">משימות</button>
 
     <!-- Reporters Management Modal -->
     <div id="reportersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
