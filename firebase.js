@@ -5,9 +5,9 @@ import {
     signInAnonymously, 
     signInWithCustomToken, 
     onAuthStateChanged,
-    signInWithEmailAndPassword, // Added this export
-    createUserWithEmailAndPassword, // Added this export
-    signOut // Added this export
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    signOut 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -23,11 +23,8 @@ import {
     where, 
     orderBy, 
     getDocs, 
-    // FieldValue is NOT imported or re-exported from here.
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// IMPORTANT: For local VS Code development, hardcode your Firebase config here.
-// When running in the Canvas environment, the Canvas will provide __firebase_config automatically.
 const firebaseConfig = {
   apiKey: "AIzaSyC2o9IuXKBuYsbf_tSWdAPRhZMyvOwG4rc",
   authDomain: "hapak-lappid.firebaseapp.com",
@@ -64,8 +61,8 @@ export {
     app,
     db,
     auth,
-    appId, // Export appId for use in constructing collection paths
-    initialAuthToken, // Export initialAuthToken for auth logic
+    appId, 
+    initialAuthToken, 
     
     // Auth functions - these must be exported from firebase.js
     onAuthStateChanged,
@@ -88,5 +85,4 @@ export {
     where,
     orderBy, 
     getDocs,
-    // FieldValue is explicitly NOT exported from here.
 };
