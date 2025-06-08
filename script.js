@@ -3,6 +3,7 @@ let reports = [];
 let editingReportIndex = null; 
 let lastAddedReportId = null; 
 let collapsedGroups = new Set(); 
+let currentUserId = null;
 
 // --- Firebase Imports ---
 import { 
@@ -15,17 +16,26 @@ import {
     onSnapshot, 
     collection, 
     doc, 
+    signInAnonymously, 
     signInWithEmailAndPassword, 
-    signOut 
+    signOut,
+    deleteDoc, 
+    initialAuthToken, 
 } from './firebase.js'; 
 
-// Import FieldValue DIRECTLY from the Firestore SDK
-// import { FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-
-let currentUserId = null;
+// Firestore collection references
 let reportsCollectionRef = null; 
+let reportersCollectionRef = null;
+let tasksCompletionCollectionRef = null; 
+
+// Unsubscribe functions for real-time listeners
 let unsubscribeFromReports = null; 
+let unsubscribeFromReporters = null; 
+let unsubscribeFromTasksCompletion = null; 
+
+// Global state for tasks completion (client-side cache)
+let completedTasks = {}; // Stores { logType: { taskId: true/false } }
+let selectedLogTypeTasksCompleted = true; // Tracks if all tasks for the *currently selected log type* are completed
 
 
 // --- Global DOM element references ---
@@ -52,10 +62,15 @@ let loginPasswordInput;
 let loginBtn;
 let loginErrorMessage;
 let logoutBtn;
-let exportExcelBtn; // New DOM reference
-let searchLogBtn;   // New DOM reference
-let searchInput;    // New DOM reference
 
+// Header Menu & Buttons
+let menuToggleBtn; // New for hamburger menu
+let headerMenu;     // New for dropdown menu
+let searchLogBtn;   
+let searchInput;    
+let exportExcelBtn; 
+let editReportersBtn; 
+let tasksButton;    // New dedicated tasks button
 
 // Clock DOM references
 let currentTimeDisplay;
@@ -64,14 +79,39 @@ let assessmentTimePlusBtn;
 let assessmentTimeMinusBtn;
 
 // Clock state variables
-let assessmentTime = new Date(); // Initialize with current time
+let assessmentTime = new Date(); 
 let assessmentTimeIsManual = false; // Flag to indicate if assessment time was manually set
+
+// Tasks Panel DOM references
+let tasksPanel;
+let closeTasksPanelBtn;
+let tasksLogTypeDisplay;
+let tasksList;
+let allTasksCompletedMessage;
+
+// Reporters Modal DOM references
+let reportersModal;
+let closeReportersModalBtn;
+let newReporterNameInput;
+let addReporterBtn;
+let reportersListUl;
+let reporterErrorMessage;
+
+// Custom Alert DOM references
+let customAlert;
+let customAlertMessage;
+let customAlertCloseBtn;
 
 
 // --- UI State Management ---
 const showLoginPage = () => {
     if (loginPage) loginPage.classList.remove('hidden');
     if (appContent) appContent.classList.add('hidden');
+    // Hide tasks panel and reporters modal on logout
+    if (tasksPanel) tasksPanel.classList.remove('is-open');
+    if (reportersModal) reportersModal.classList.add('hidden');
+    // Close header menu on logout
+    if (headerMenu) headerMenu.classList.remove('open');
 };
 
 const showAppContent = () => {
@@ -79,6 +119,13 @@ const showAppContent = () => {
     if (appContent) appContent.classList.remove('hidden');
 };
 
+// Function to show custom alert
+const showCustomAlert = (message) => {
+    if (customAlert && customAlertMessage) {
+        customAlertMessage.textContent = message;
+        customAlert.classList.remove('hidden');
+    }
+};
 
 // --- Auto-resize Textarea Logic ---
 const autoResizeTextarea = (textarea) => {
@@ -172,6 +219,12 @@ const renderTable = (searchTerm = '') => {
     
     if (currentDisplayReports.length === 0) {
         if (emptyStateRow) { 
+            // Update colspan for mobile and desktop views
+            // On desktop: 6 columns (דיווח, תאריך, שעה, מדווח, שיוך, פעולות)
+            // On mobile: 3 columns (דיווח, שעה, פעולות)
+            const colspan = window.innerWidth <= 639 ? 3 : 6; 
+            emptyStateRow.querySelector('td').setAttribute('colspan', colspan);
+
             emptyStateRow.classList.remove('hidden'); 
             tableBody.appendChild(emptyStateRow);
         }
@@ -187,9 +240,10 @@ const renderTable = (searchTerm = '') => {
     currentDisplayReports.forEach(report => {
         const dateKey = report.date; 
         if (!groupedReports.has(dateKey)) {
-            groupedReports.set(dateKey, []);
+            groupedReports.set(dateKey, { reports: [], logTypes: new Set() });
         }
-        groupedReports.get(dateKey).push(report);
+        groupedReports.get(dateKey).reports.push(report);
+        groupedReports.get(dateKey).logTypes.add(report.logType);
     });
 
     const sortedDateKeys = Array.from(groupedReports.keys()).sort((a, b) => {
@@ -200,15 +254,20 @@ const renderTable = (searchTerm = '') => {
     const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
 
     sortedDateKeys.forEach(dateKey => {
-        const reportsForDate = groupedReports.get(dateKey);
+        const { reports: reportsForDate, logTypes } = groupedReports.get(dateKey);
         const isToday = dateKey === todayKey;
         // Only collapse if not searching
         const isCollapsed = searchTerm ? false : collapsedGroups.has(dateKey); 
 
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
+        
+        // Colspan for group header: 6 columns on desktop, 3 on mobile
+        const headerColspan = window.innerWidth <= 639 ? 3 : 6;
+
+        // Date group header should only display date (Point 1)
         headerRow.innerHTML = `
-            <td colspan="6" class="p-3 font-bold text-[#6D5F53] text-right">
+            <td colspan="${headerColspan}" class="p-3 font-bold text-[#6D5F53] text-right">
                 <button class="toggle-day-btn text-blue-600 hover:text-blue-800 ml-2" data-toggle-date="${dateKey}">
                     ${isCollapsed ? '◀' : '▼'}
                 </button>
@@ -222,7 +281,9 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.dataset.contentDate = dateKey; 
 
         const reportsCell = document.createElement('td');
-        reportsCell.colSpan = 6;
+        // Colspan for reports cell within group: 6 columns on desktop, 3 on mobile
+        const reportsCellColspan = window.innerWidth <= 639 ? 3 : 6;
+        reportsCell.colSpan = reportsCellColspan;
         reportsCell.className = 'p-0'; 
 
         const innerTable = document.createElement('table'); 
@@ -239,6 +300,12 @@ const renderTable = (searchTerm = '') => {
             const reportRow = document.createElement('tr');
             reportRow.className = 'hover:bg-[#F8F5F1]';
 
+            // Check if report is older than 48 hours for edit lock 
+            const reportDateTime = new Date(report.timestamp); // Use the timestamp from Firebase
+            const now = new Date();
+            const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
+            const canEdit = diffHours < 48;
+
             // Function to highlight text
             const highlightText = (text, term) => {
                 if (!term) return text;
@@ -248,12 +315,12 @@ const renderTable = (searchTerm = '') => {
 
             reportRow.innerHTML = `
                 <td class="table-cell">${highlightText(report.description, searchTerm)}</td>
-                <td class="table-cell">${formatAsDDMMYYYY(report.date)}</td>
+                <td class="table-cell table-cell-desktop-only">${formatAsDDMMYYYY(report.date)}</td> <!-- Restored for desktop -->
                 <td class="table-cell">${report.time}</td>
-                <td class="table-cell">${highlightText(report.reporter, searchTerm)}</td>
-                <td class="table-cell">${highlightText(report.logType, searchTerm)}</td>
+                <td class="table-cell table-cell-desktop-only">${highlightText(report.reporter, searchTerm)}</td>
+                <td class="table-cell table-cell-desktop-only">${highlightText(report.logType, searchTerm)}</td> <!-- Restored for desktop -->
                 <td class="table-cell text-center whitespace-nowrap">
-                    <button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>
+                    ${canEdit ? `<button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>` : `<span class="text-gray-400">לא ניתן לערוך</span>`}
                 </td>
             `;
             innerTbody.appendChild(reportRow);
@@ -264,7 +331,7 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.appendChild(reportsCell);
         tableBody.appendChild(reportsContainerRow);
         
-        if (!isToday && !collapsedGroups.has(dateKey) && !searchTerm) { // Only collapse if not searching
+        if (!isToday && !collapsedGroups.has(dateKey) && !searchTerm) { 
             collapsedGroups.add(dateKey); 
             reportsContainerRow.classList.add('hidden'); 
             const toggleButton = headerRow.querySelector('.toggle-day-btn');
@@ -292,7 +359,6 @@ const renderTable = (searchTerm = '') => {
     });
     
     console.log('Current reports array (raw data from Firebase):', reports); 
-    console.log('Reports displayed in table (after hybrid sorting and grouping):', currentDisplayReports);
     console.log('Collapsed Groups State:', collapsedGroups);
 };
 
@@ -331,6 +397,12 @@ const resetForm = () => {
     if (newTimeInput) { 
         newTimeInput.readOnly = false; 
     }
+
+    if (filterLogType) {
+        filterLogType.value = ""; // Reset log type selection
+        updateTasksButtonState(""); // Update tasks button for empty selection
+    }
+    toggleTasksPanel(false); // Hide tasks panel on form reset
 };
 
 // Adds a new report to Firestore
@@ -354,6 +426,16 @@ const addReport = async () => {
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
+    if (!reporter || reporter === '') {
+        inputErrorMessage.textContent = 'יש לבחור מדווח.';
+        setTimeout(() => inputErrorMessage.textContent = '', 3000);
+        return;
+    }
+    if (!logType || logType === '') {
+        inputErrorMessage.textContent = 'יש לבחור שיוך יומן.';
+        setTimeout(() => inputErrorMessage.textContent = '', 3000);
+        return;
+    }
 
     const newReportData = { 
         description, 
@@ -362,7 +444,7 @@ const addReport = async () => {
         reporter, 
         logType,
         creatorId: currentUserId, 
-        //createdAt: FieldValue.serverTimestamp() 
+        timestamp: new Date().toISOString(), 
     };
 
     try {
@@ -370,7 +452,6 @@ const addReport = async () => {
         console.log("Document written with ID: ", docRef.id);
         lastAddedReportId = docRef.id; 
         collapsedGroups.delete(newReportData.date); 
-        // renderTable is triggered by onSnapshot. lastAddedReportId will be cleared there.
         resetForm(); 
     } catch (e) {
         console.error("Error adding document: ", e);
@@ -405,6 +486,16 @@ const updateReport = async () => {
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
+    if (!reporter || reporter === '') {
+        inputErrorMessage.textContent = 'יש לבחור מדווח.';
+        setTimeout(() => inputErrorMessage.textContent = '', 3000);
+        return;
+    }
+    if (!logType || logType === '') {
+        inputErrorMessage.textContent = 'יש לבחור שיוך יומן.';
+        setTimeout(() => inputErrorMessage.textContent = '', 3000);
+        return;
+    }
 
     const reportToUpdate = reports[editingReportIndex];
     if (!reportToUpdate || !reportToUpdate.id) {
@@ -414,21 +505,32 @@ const updateReport = async () => {
         return;
     }
 
+    // Check 48-hour edit lock 
+    const reportDateTime = new Date(reportToUpdate.timestamp);
+    const now = new Date();
+    const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
+    if (diffHours >= 48) {
+        showCustomAlert('לא ניתן לערוך דיווחים בני יותר מ-48 שעות.');
+        resetForm();
+        return;
+    }
+
+
     const updatedReportData = {
         description,
         date,
         time,
         reporter,
         logType,
+        // timestamp is NOT updated on edit to preserve original creation time for the 48-hour rule
     };
 
     try {
         const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); 
         await setDoc(docRef, updatedReportData, { merge: true }); 
         console.log("Document updated with ID: ", reportToUpdate.id);
-        lastAddedReportId = reportToUpdate.id; // Set lastAddedReportId for update too
+        lastAddedReportId = reportToUpdate.id; 
         collapsedGroups.delete(reportToUpdate.date); 
-        // renderTable is triggered by onSnapshot. lastAddedReportId will be cleared there.
         resetForm(); 
     } catch (e) {
         console.error("Error updating document: ", e);
@@ -456,6 +558,16 @@ const handleAuthState = async (user) => {
              reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
              console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
         }
+        // Initialize reporters collection reference
+        if (!reportersCollectionRef) {
+            reportersCollectionRef = collection(db, `artifacts/${appId}/public/data/reporters`);
+            console.log('Reporters collection path (PUBLIC):', `artifacts/${appId}/public/data/reporters`);
+        }
+        // Initialize tasks completion collection reference
+        if (!tasksCompletionCollectionRef) {
+            tasksCompletionCollectionRef = doc(db, `artifacts/${appId}/users/${currentUserId}/tasks_completion`, 'status');
+            console.log('Tasks completion document path (PRIVATE):', `artifacts/${appId}/users/${currentUserId}/tasks_completion/status`);
+        }
        
         // Set up real-time listener for reports if not active
         if (!unsubscribeFromReports) {
@@ -473,12 +585,60 @@ const handleAuthState = async (user) => {
             });
         }
 
+        // Set up real-time listener for reporters 
+        if (!unsubscribeFromReporters) {
+            unsubscribeFromReporters = onSnapshot(reportersCollectionRef, (snapshot) => {
+                const fetchedReporters = [];
+                snapshot.forEach(doc => {
+                    fetchedReporters.push(doc.data().name); 
+                });
+                populateReportersDropdown(fetchedReporters);
+                renderReportersInModal(fetchedReporters);
+            }, (error) => {
+                console.error("Error getting reporters in real-time: ", error);
+            });
+        }
+
+        // Set up real-time listener for tasks completion 
+        if (!unsubscribeFromTasksCompletion) {
+            unsubscribeFromTasksCompletion = onSnapshot(tasksCompletionCollectionRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    completedTasks = docSnap.data();
+                    console.log("Completed tasks loaded:", completedTasks);
+                } else {
+                    console.log("No completed tasks data found for user.");
+                    completedTasks = {}; 
+                }
+                // Re-render tasks panel if it's open, to reflect updated completion status
+                if (tasksPanel && tasksPanel.classList.contains('is-open')) {
+                    const currentLogType = tasksLogTypeDisplay.textContent.replace('משימות עבור ', '');
+                    renderTasksPanel(currentLogType);
+                }
+                updateTasksButtonState(filterLogType.value); // Update button state after tasks load
+            }, (error) => {
+                console.error("Error getting tasks completion in real-time: ", error);
+            });
+        }
+
     } else {
         console.log('No user signed in. Showing login page.');
         showLoginPage(); 
         reports = []; 
-        renderTable(); // Clear table on logout
+        renderTable(); 
         resetForm(); 
+
+        // Unsubscribe from all listeners on logout
+        if (unsubscribeFromReports) unsubscribeFromReports();
+        unsubscribeFromReports = null;
+        if (unsubscribeFromReporters) unsubscribeFromReporters();
+        unsubscribeFromReporters = null;
+        if (unsubscribeFromTasksCompletion) unsubscribeFromTasksCompletion();
+        unsubscribeFromTasksCompletion = null;
+
+        // Hide and clear search input on logout
+        if (searchInput) searchInput.classList.add('hidden'); 
+        if (searchInput) searchInput.value = ''; 
+        isSearchInputVisible = false;
     }
 };
 
@@ -493,43 +653,37 @@ const updateCurrentTime = () => {
     if (currentTimeDisplay) {
         currentTimeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
     }
-    return now; // Return current time for comparison
+    return now; 
 };
 
 // Update assessment time display
 const updateAssessmentTimeDisplay = () => {
     const now = new Date();
-    // Check if assessmentTime is essentially the same as current time (within a few seconds)
-    // Or if it was manually set and is now in the past
-    const isSameAsCurrent = Math.abs(assessmentTime.getTime() - now.getTime()) < 5000; // 5 seconds threshold
-
+    
     if (assessmentTimeDisplay) {
-        if (isSameAsCurrent && !assessmentTimeIsManual) {
+        if (!assessmentTimeIsManual) { // Only display "טרם נקבע" if not manually set
             assessmentTimeDisplay.textContent = 'טרם נקבע';
-            assessmentTimeDisplay.classList.remove('blinking-red'); // Ensure no blinking if "טרם נקבע"
+            assessmentTimeDisplay.classList.remove('blinking-red'); 
         } else {
             const hours = assessmentTime.getHours().toString().padStart(2, '0');
             const minutes = assessmentTime.getMinutes().toString().padStart(2, '0');
             assessmentTimeDisplay.textContent = `${hours}:${minutes}`;
-            checkBlinkingStatus();
+            checkBlinkingStatus(); // Continue blinking check if manually set
         }
     }
 };
 
 // Check and apply blinking status for assessment time
 const checkBlinkingStatus = () => {
-    const now = updateCurrentTime(); // Get latest current time
+    const now = updateCurrentTime(); 
     const diffMs = assessmentTime.getTime() - now.getTime();
     const diffMinutes = diffMs / (1000 * 60);
 
     if (assessmentTimeDisplay) {
-        // If assessment time is in the past, or exactly current time, or very close (within 100ms)
-        // it should not blink, unless it was just adjusted to be past current time
-        if (diffMinutes <= 0 && !assessmentTimeIsManual) { // If time has passed or arrived, stop blinking and revert color
-            assessmentTimeDisplay.classList.remove('blinking-red');
-        } else if (diffMinutes > 0 && diffMinutes <= 5) { // Within 5 minutes and in the future
+        // Blinking only if time is in the future and within 5 minutes
+        if (diffMinutes > 0 && diffMinutes <= 5) { 
             assessmentTimeDisplay.classList.add('blinking-red');
-        } else { // More than 5 minutes away
+        } else { 
             assessmentTimeDisplay.classList.remove('blinking-red');
         }
     }
@@ -538,25 +692,13 @@ const checkBlinkingStatus = () => {
 // --- Export to Excel Functionality ---
 const exportReportsToExcel = () => {
     if (reports.length === 0) {
-        // Using alert for simplicity, could be custom modal
-        const customAlert = document.createElement('div');
-        customAlert.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50';
-        customAlert.innerHTML = `
-            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
-                <p class="text-lg font-semibold text-[#6D5F53] mb-4">אין דיווחים לייצוא.</p>
-                <button id="alertCloseBtn" class="btn-primary py-2 px-4 rounded-lg">אישור</button>
-            </div>
-        `;
-        document.body.appendChild(customAlert);
-        document.getElementById('alertCloseBtn').addEventListener('click', () => {
-            document.body.removeChild(customAlert);
-        });
+        showCustomAlert('אין דיווחים לייצוא.');
         return;
     }
 
     const header = ["דיווח", "תאריך", "שעה", "שם המדווח", "שיוך יומן"].join(',');
     const csvRows = reports.map(report => {
-        const description = `"${report.description.replace(/"/g, '""')}"`; // Handle commas and quotes
+        const description = `"${report.description.replace(/"/g, '""')}"`; 
         const formattedDate = formatAsDDMMYYYY(report.date);
         return [description, formattedDate, report.time, report.reporter, report.logType].join(',');
     });
@@ -569,13 +711,13 @@ const exportReportsToExcel = () => {
     const today = new Date();
     const dateString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
     link.setAttribute("download", `גיבוי יומן חפק לתאריך ${dateString}.csv`);
-    document.body.appendChild(link); // Required for Firefox
+    document.body.appendChild(link); 
     link.click();
-    document.body.removeChild(link); // Clean up
+    document.body.removeChild(link); 
 };
 
 // --- Search Functionality ---
-let isSearchInputVisible = false; // To manage search input visibility
+let isSearchInputVisible = false; 
 
 const toggleSearchInput = () => {
     if (searchInput) {
@@ -584,17 +726,326 @@ const toggleSearchInput = () => {
             searchInput.classList.remove('hidden');
             searchInput.focus();
         } else {
-            searchInput.value = ''; // Clear search when hidden
-            searchInput.classList.add('hidden'); // Hide search input
-            performSearch(); // Re-render table without search filter
+            searchInput.value = ''; 
+            searchInput.classList.add('hidden'); 
+            performSearch(); 
         }
     }
 };
 
 const performSearch = () => {
     const searchTerm = searchInput ? searchInput.value.trim() : '';
-    renderTable(searchTerm); // Render table with search term
+    renderTable(searchTerm); 
 };
+
+
+// --- Reporters Management ---
+let currentReporters = []; 
+
+const populateReportersDropdown = (reportersArray) => {
+    if (filterReporter) {
+        filterReporter.innerHTML = ''; 
+        // Add a default empty option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'בחר מדווח';
+        filterReporter.appendChild(defaultOption);
+
+        if (reportersArray.length === 0) {
+            filterReporter.disabled = true;
+        } else {
+            reportersArray.sort((a,b) => a.localeCompare(b, 'he')); 
+            reportersArray.forEach(reporter => {
+                const option = document.createElement('option');
+                option.value = reporter;
+                option.textContent = reporter;
+                filterReporter.appendChild(option);
+            });
+            filterReporter.disabled = false;
+        }
+        currentReporters = reportersArray; 
+    }
+};
+
+const renderReportersInModal = (reportersArray) => {
+    if (reportersListUl) {
+        reportersListUl.innerHTML = '';
+        if (reportersArray.length === 0) {
+            reportersListUl.innerHTML = '<li class="p-4 text-center text-gray-500">אין מדווחים מוגדרים.</li>';
+            return;
+        }
+        reportersArray.sort((a,b) => a.localeCompare(b, 'he')); 
+        reportersArray.forEach(reporter => {
+            const li = document.createElement('li');
+            li.className = 'reporters-list-item';
+            li.innerHTML = `
+                <span>${reporter}</span>
+                <button data-name="${reporter}">מחק</button>
+            `;
+            reportersListUl.appendChild(li);
+        });
+
+        // Add event listener for delete buttons
+        reportersListUl.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const nameToDelete = e.target.dataset.name;
+                await deleteReporterFromFirestore(nameToDelete);
+            });
+        });
+    }
+};
+
+const openReportersModal = () => {
+    if (reportersModal) {
+        reportersModal.classList.remove('hidden');
+        if (newReporterNameInput) newReporterNameInput.value = ''; 
+        if (reporterErrorMessage) reporterErrorMessage.textContent = ''; 
+        renderReportersInModal(currentReporters); 
+    }
+};
+
+const closeReportersModal = () => {
+    if (reportersModal) {
+        reportersModal.classList.add('hidden');
+    }
+};
+
+const addReporterToFirestore = async (name) => {
+    if (!name || name.trim() === '') {
+        if (reporterErrorMessage) reporterErrorMessage.textContent = 'שם המדווח אינו יכול להיות ריק.';
+        return;
+    }
+    if (currentReporters.includes(name.trim())) {
+        if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח בשם זה כבר קיים.';
+        return;
+    }
+
+    try {
+        await addDoc(reportersCollectionRef, { name: name.trim() });
+        console.log(`Reporter "${name}" added.`);
+        if (newReporterNameInput) newReporterNameInput.value = '';
+        if (reporterErrorMessage) reporterErrorMessage.textContent = '';
+    } catch (e) {
+        console.error("Error adding reporter: ", e);
+        if (reporterErrorMessage) reporterErrorMessage.textContent = 'שגיאה בהוספת מדווח: ' + e.message;
+    }
+};
+
+const deleteReporterFromFirestore = async (name) => {
+    try {
+        // Find the document ID for the reporter by name
+        const q = query(reportersCollectionRef, where("name", "==", name));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const docToDelete = querySnapshot.docs[0];
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/reporters`, docToDelete.id));
+            console.log(`Reporter "${name}" deleted.`);
+            if (reporterErrorMessage) reporterErrorMessage.textContent = '';
+        } else {
+            console.warn(`Reporter "${name}" not found for deletion.`);
+            if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח לא נמצא.';
+        }
+    } catch (e) {
+        console.error("Error deleting reporter: ", e);
+        if (reporterErrorMessage) reporterErrorMessage.textContent = 'שגיאה במחיקת מדווח: ' + e.message;
+    }
+};
+
+
+// --- Order of Operations / Tasks Panel ---
+// Dummy data for order of operations. THIS SHOULD BE LOADED FROM A DATABASE/CONFIG.
+const orderOfOperations = {
+    "בטחוני": [
+        { id: 'sec_task_1', text: 'בדיקת קשר ותקשורת עם מפקדה' },
+        { id: 'sec_task_2', text: 'אבטחת שטח/ציר פיזי' },
+        { id: 'sec_task_3', text: 'פריסת כוחות/עמדות' },
+        { id: 'sec_task_4', text: 'תיאום עם גורמי ביטחון נוספים' },
+        { id: 'sec_task_5', text: 'הערכת מצב ראשונית' },
+    ],
+    "שריפה": [
+        { id: 'fire_task_1', text: 'הודעה מיידית לכבאות והצלה' },
+        { id: 'fire_task_2', text: 'פינוי מיידי של נפגעים/לכודים' },
+        { id: 'fire_task_3', text: 'הגדרת קווי אש/מגבלות התפשטות' },
+        { id: 'fire_task_4', text: 'אבטחת גישה לצוותי חירום' },
+        { id: 'fire_task_5', text: 'כיבוי ראשוני (אם בטוח)' },
+    ],
+    "נעדר": [
+        { id: 'missing_task_1', text: 'קבלת פרטים מזהים ופרטי לבוש' },
+        { id: 'missing_task_2', text: 'איסוף מידע על נסיבות ההיעלמות' },
+        { id: 'missing_task_3', text: 'פתיחת סריקה ראשונית באזור' },
+        { id: 'missing_task_4', text: 'הודעה למשטרה ולגורמי חיפוש' },
+        { id: 'missing_task_5', text: 'גיוס כוחות סיוע (מתנדבים/כלבנים)' },
+    ],
+    "שגרה": [
+        { id: 'routine_task_1', text: 'בדיקת תקינות מערכות' },
+        { id: 'routine_task_2', text: 'עדכון סטטוס משימות פתוחות' },
+        { id: 'routine_task_3', text: 'ביצוע סיור/בדיקה תקופתית' },
+        { id: 'routine_task_4', text: 'הכנת ציוד ומשאבים' },
+    ],
+};
+
+const toggleTasksPanel = (open) => { // Removed logType from here, handled in renderTasksPanel
+    if (tasksPanel) {
+        if (open) {
+            tasksPanel.classList.add('is-open');
+        } else {
+            tasksPanel.classList.remove('is-open');
+        }
+    }
+};
+
+// Function to update the "משימות" button's color based on completion status of the selected log type
+const updateTasksButtonState = (logType) => {
+    if (!tasksButton) return;
+
+    if (!logType || logType === '') {
+        tasksButton.classList.remove('btn-tasks-completed');
+        tasksButton.classList.remove('btn-tasks'); // Remove red/green classes
+        tasksButton.classList.add('btn-secondary'); // Make it grey/default
+        tasksButton.disabled = true;
+        return;
+    } else {
+        tasksButton.classList.remove('btn-secondary'); // Remove grey/default
+        tasksButton.disabled = false;
+    }
+
+    const tasksForType = orderOfOperations[logType] || [];
+    if (tasksForType.length === 0) {
+        tasksButton.classList.add('btn-tasks-completed'); // Green if no tasks defined
+        tasksButton.classList.remove('btn-tasks'); // Ensure no red class
+        return;
+    }
+
+    selectedLogTypeTasksCompleted = true; // Assume true, then check
+    for (const task of tasksForType) {
+        const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
+        if (!isCompleted) {
+            selectedLogTypeTasksCompleted = false;
+            break;
+        }
+    }
+
+    if (selectedLogTypeTasksCompleted) {
+        tasksButton.classList.add('btn-tasks-completed'); // Green
+        tasksButton.classList.remove('btn-tasks'); // Ensure no red class
+    } else {
+        tasksButton.classList.remove('btn-tasks-completed'); // Red
+        tasksButton.classList.add('btn-tasks'); // Ensure red class
+    }
+};
+
+
+const renderTasksPanel = (logType) => {
+    if (!tasksList || !tasksLogTypeDisplay || !allTasksCompletedMessage) {
+        console.error('Task panel elements not found.');
+        return;
+    }
+
+    tasksLogTypeDisplay.textContent = logType;
+    tasksList.innerHTML = '';
+    const tasksForType = orderOfOperations[logType] || [];
+    
+    let allTasksCompletedForTypeCurrentlyDisplayed = true;
+
+    if (tasksForType.length === 0) {
+        tasksList.innerHTML = `<p class="text-gray-500 text-center">אין משימות מוגדרות עבור ${logType}.</p>`;
+        allTasksCompletedForTypeCurrentlyDisplayed = false; 
+    } else {
+        tasksForType.forEach(task => {
+            const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
+            if (!isCompleted) {
+                allTasksCompletedForTypeCurrentlyDisplayed = false;
+            }
+
+            const taskItemDiv = document.createElement('div');
+            taskItemDiv.className = `task-item ${isCompleted ? 'highlight-completed' : ''}`;
+            taskItemDiv.innerHTML = `
+                <input type="checkbox" id="task-${task.id}" data-task-id="${task.id}" data-log-type="${logType}" ${isCompleted ? 'checked' : ''}>
+                <label for="task-${task.id}" class="cursor-pointer flex-grow">${task.text}</label>
+            `;
+            tasksList.appendChild(taskItemDiv);
+
+            // Add event listener to checkbox
+            taskItemDiv.querySelector(`input[type="checkbox"]`).addEventListener('change', (e) => {
+                handleTaskCheckboxChange(e.target.dataset.taskId, e.target.dataset.logType, task.text, e.target.checked);
+            });
+        });
+    }
+
+    // Show/hide "All tasks completed" message
+    if (allTasksCompletedForTypeCurrentlyDisplayed && tasksForType.length > 0) {
+        allTasksCompletedMessage.classList.remove('hidden');
+        // Do NOT hide the panel here, user might want to see the completed list
+    } else {
+        allTasksCompletedMessage.classList.add('hidden');
+    }
+    updateTasksButtonState(logType); // Update button state after rendering tasks
+};
+
+const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) => {
+    const now = new Date();
+    const date = now.toISOString().split('T')[0];
+    const time = now.toTimeString().split(' ')[0].substring(0, 5); 
+
+    const taskReportDescription = `משימת "${taskText}" עבור שיוך "${logType}" ${isChecked ? 'הושלמה' : 'בוטלה'}.`;
+    const reportIdPrefix = `task-${logType}-${taskId}`; 
+
+    // Update client-side state
+    if (!completedTasks[logType]) {
+        completedTasks[logType] = {};
+    }
+    completedTasks[logType][taskId] = isChecked;
+
+    // Update Firestore for task completion status (private to user)
+    try {
+        await setDoc(tasksCompletionCollectionRef, completedTasks, { merge: true });
+        console.log(`Task completion status updated for ${logType}/${taskId}.`);
+    } catch (error) {
+        console.error("Error updating task completion status:", error);
+    }
+
+    // Find if a corresponding report already exists
+    const existingTaskReport = reports.find(r => r.description === taskReportDescription && r.isTaskReport && r.taskReportId === reportIdPrefix);
+
+    if (isChecked) {
+        if (!existingTaskReport) {
+            // Add a new report to the main reports collection
+            const newReportData = {
+                description: taskReportDescription,
+                date: date,
+                time: time,
+                reporter: filterReporter.value, 
+                logType: logType,
+                creatorId: currentUserId,
+                timestamp: new Date().toISOString(),
+                isTaskReport: true, 
+                taskReportId: reportIdPrefix, 
+            };
+            try {
+                await addDoc(reportsCollectionRef, newReportData);
+                console.log("Auto-generated task report added.");
+            } catch (e) {
+                console.error("Error adding auto-generated task report: ", e);
+            }
+        } else {
+            console.log("Task report already exists, no new report added.");
+        }
+    } else { 
+        if (existingTaskReport) {
+            // Delete the corresponding report from the main reports collection
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id));
+                console.log("Auto-generated task report deleted.");
+            } catch (e) {
+                console.error("Error deleting auto-generated task report: ", e);
+            }
+        }
+    }
+    
+    // Re-render the tasks panel to reflect visual changes and update button state
+    renderTasksPanel(logType);
+};
+
 
 // --- DOMContentLoaded listener ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -622,16 +1073,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginBtn = document.getElementById('loginBtn');
     loginErrorMessage = document.getElementById('loginErrorMessage');
     logoutBtn = document.getElementById('logoutBtn');
-    exportExcelBtn = document.getElementById('exportExcelBtn'); 
+
+    // Header Menu & Buttons
+    menuToggleBtn = document.getElementById('menuToggleBtn');
+    headerMenu = document.getElementById('headerMenu');
     searchLogBtn = document.getElementById('searchLogBtn');     
     searchInput = document.getElementById('searchInput');       
-
+    exportExcelBtn = document.getElementById('exportExcelBtn'); 
+    editReportersBtn = document.getElementById('editReportersBtn'); 
+    tasksButton = document.getElementById('tasksButton');
 
     // Clock DOM references
     currentTimeDisplay = document.getElementById('currentTimeDisplay');
     assessmentTimeDisplay = document.getElementById('assessmentTimeDisplay');
     assessmentTimePlusBtn = document.getElementById('assessmentTimePlusBtn');
     assessmentTimeMinusBtn = document.getElementById('assessmentTimeMinusBtn');
+
+    // Tasks Panel DOM references
+    tasksPanel = document.getElementById('tasksPanel');
+    closeTasksPanelBtn = document.getElementById('closeTasksPanelBtn');
+    tasksLogTypeDisplay = document.getElementById('tasksLogTypeDisplay');
+    tasksList = document.getElementById('tasksList');
+    allTasksCompletedMessage = document.getElementById('allTasksCompletedMessage');
+
+    // Reporters Modal DOM references
+    reportersModal = document.getElementById('reportersModal');
+    closeReportersModalBtn = document.getElementById('closeReportersModalBtn');
+    newReporterNameInput = document.getElementById('newReporterName');
+    addReporterBtn = document.getElementById('addReporterBtn');
+    reportersListUl = document.getElementById('reportersList');
+    reporterErrorMessage = document.getElementById('reporterErrorMessage');
+
+    // Custom Alert DOM references
+    customAlert = document.getElementById('customAlert');
+    customAlertMessage = document.getElementById('customAlertMessage');
+    customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
+
 
     // --- Firebase Initialization ---
     if (!auth || !db) {
@@ -644,15 +1121,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initial state: show loading then login page
     if (loadingStateRow) loadingStateRow.classList.remove('hidden'); 
 
+    // Attempt anonymous sign-in or custom token sign-in on load to bypass login
+    try {
+        if (initialAuthToken) {
+            await signInWithCustomToken(auth, initialAuthToken);
+            console.log("Signed in with custom token.");
+        } else {
+            await signInAnonymously(auth);
+            console.log("Signed in anonymously.");
+        }
+    } catch (error) {
+        console.error("Error during automatic sign-in:", error);
+        loginErrorMessage.textContent = "שגיאת התחברות אוטומטית: " + error.message;
+        showLoginPage(); 
+    }
+
 
     // --- Set up initial data/listeners ---
     setDefaultDateTime();
     resetForm(); 
 
     // Initialize clocks
-    assessmentTime = updateCurrentTime(); // Set initial assessment time to current time
-    assessmentTime.setMinutes(assessmentTime.getMinutes() + 30); // Add 30 minutes to start
-    assessmentTime.setSeconds(0); // Clear seconds for cleaner display
+    // assessmentTime is already initialized with current time. Keep assessmentTimeIsManual as false initially.
+    assessmentTime.setMinutes(assessmentTime.getMinutes() + 30); // Add 30 minutes for a meaningful initial future time
+    assessmentTime.setSeconds(0); 
+    assessmentTime.setMilliseconds(0);
     updateAssessmentTimeDisplay(); // Update display with initial state
     setInterval(updateCurrentTime, 1000); // Update current time every second
     setInterval(updateAssessmentTimeDisplay, 1000); // Check assessment time status every second
@@ -781,6 +1274,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const reportToEdit = reports[index];
                 
+                // Check 48-hour edit lock 
+                const reportDateTime = new Date(reportToEdit.timestamp);
+                const now = new Date();
+                const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
+                if (diffHours >= 48) {
+                    showCustomAlert('לא ניתן לערוך דיווחים בני יותר מ-48 שעות.');
+                    return;
+                }
+
                 if (generalTextInput) generalTextInput.value = reportToEdit.description;
                 if (newDateInput) newDateInput.value = reportToEdit.date;
                 if (newTimeInput) newTimeInput.value = reportToEdit.time; 
@@ -823,11 +1325,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const prospectiveTime = new Date(assessmentTime.getTime());
             prospectiveTime.setMinutes(prospectiveTime.getMinutes() - 10);
             
-            const now = updateCurrentTime(); // Get the very latest current time for comparison
+            const now = updateCurrentTime(); 
             if (prospectiveTime.getTime() < now.getTime()) {
-                // If prospective time is earlier than current time, set it to current time
                 assessmentTime = now;
-                assessmentTime.setSeconds(0); // Ensure no seconds when snapping to current
+                assessmentTime.setSeconds(0); 
                 assessmentTime.setMilliseconds(0);
             } else {
                 assessmentTime = prospectiveTime;
@@ -836,19 +1337,115 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- New Buttons Event Listeners ---
-    if (exportExcelBtn) {
-        exportExcelBtn.addEventListener('click', exportReportsToExcel);
-    }
-    if (searchLogBtn) {
-        searchLogBtn.addEventListener('click', toggleSearchInput);
-    }
-    if (searchInput) {
-        searchInput.addEventListener('input', performSearch); // Live search as user types
+    // --- Header Menu Event Listeners ---
+    if (menuToggleBtn) {
+        menuToggleBtn.addEventListener('click', () => {
+            headerMenu.classList.toggle('hidden');
+            headerMenu.classList.toggle('open'); // For transition animation
+        });
+        // Close menu if clicked outside
+        document.addEventListener('click', (event) => {
+            if (headerMenu && !headerMenu.contains(event.target) && !menuToggleBtn.contains(event.target)) {
+                headerMenu.classList.add('hidden');
+                headerMenu.classList.remove('open');
+            }
+        });
     }
 
+    if (searchLogBtn) {
+        searchLogBtn.addEventListener('click', () => {
+            toggleSearchInput();
+            headerMenu.classList.add('hidden'); // Close menu after selection
+            headerMenu.classList.remove('open');
+        });
+    }
+    if (searchInput) {
+        searchInput.addEventListener('input', performSearch); 
+    }
+
+    if (exportExcelBtn) {
+        exportExcelBtn.addEventListener('click', () => {
+            exportReportsToExcel();
+            headerMenu.classList.add('hidden'); // Close menu after selection
+            headerMenu.classList.remove('open');
+        });
+    }
+
+    // --- Reporters Management Event Listeners ---
+    if (editReportersBtn) {
+        editReportersBtn.addEventListener('click', () => {
+            openReportersModal();
+            headerMenu.classList.add('hidden'); // Close menu after selection
+            headerMenu.classList.remove('open');
+        });
+    }
+    if (closeReportersModalBtn) {
+        closeReportersModalBtn.addEventListener('click', closeReportersModal);
+    }
+    if (addReporterBtn) {
+        addReporterBtn.addEventListener('click', () => {
+            if (newReporterNameInput) {
+                addReporterToFirestore(newReporterNameInput.value);
+            }
+        });
+    }
+    // Listen for Enter key in newReporterNameInput
+    if (newReporterNameInput) {
+        newReporterNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addReporterBtn.click();
+            }
+        });
+    }
+
+    // --- Tasks Panel Event Listeners ---
+    if (filterLogType) {
+        filterLogType.addEventListener('change', (e) => {
+            const selectedLogType = e.target.value;
+            // Only open panel if a log type is selected and it has tasks
+            if (selectedLogType && orderOfOperations[selectedLogType] && orderOfOperations[selectedLogType].length > 0) {
+                renderTasksPanel(selectedLogType);
+                toggleTasksPanel(true);
+            } else {
+                toggleTasksPanel(false); // Hide if no log type selected or no tasks for selected type
+            }
+            updateTasksButtonState(selectedLogType); // Always update button state
+        });
+    }
+    if (closeTasksPanelBtn) {
+        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
+    }
+    // New tasks button listener
+    if (tasksButton) {
+        tasksButton.addEventListener('click', () => {
+            // Only allow opening if a log type is selected
+            const selectedLogType = filterLogType.value;
+            if (selectedLogType && orderOfOperations[selectedLogType] && orderOfOperations[selectedLogType].length > 0) {
+                renderTasksPanel(selectedLogType);
+                toggleTasksPanel(true);
+            } else if (selectedLogType) {
+                showCustomAlert(`אין משימות מוגדרות עבור "${selectedLogType}".`);
+            } else {
+                showCustomAlert("יש לבחור שיוך יומן כדי לראות משימות.");
+            }
+        });
+    }
+
+    // --- Custom Alert Event Listener ---
+    if (customAlertCloseBtn) {
+        customAlertCloseBtn.addEventListener('click', () => {
+            if (customAlert) customAlert.classList.add('hidden');
+        });
+    }
 
     // Initialize default date and time, and reset form
     setDefaultDateTime();
     resetForm(); 
+    // Initial update of tasks button state based on default/initial filterLogType value
+    updateTasksButtonState(filterLogType.value); 
+});
+
+// Update render table on window resize to adjust colspan for empty/loading states
+window.addEventListener('resize', () => {
+    renderTable(searchInput ? searchInput.value.trim() : '');
 });
