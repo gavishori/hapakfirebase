@@ -23,7 +23,7 @@ import {
     where, 
     orderBy, 
     getDocs, 
-    writeBatch // Added writeBatch for adding default reporters efficiently
+    writeBatch 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -86,5 +86,5 @@ export {
     where,
     orderBy, 
     getDocs,
-    writeBatch, // Export writeBatch
+    writeBatch, 
 };
