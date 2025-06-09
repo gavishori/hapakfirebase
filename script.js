@@ -24,7 +24,7 @@ import {
     getDocs, 
     query, 
     where,
-    writeBatch // Import writeBatch for efficient default reporter addition
+    writeBatch 
 } from './firebase.js'; 
 
 // Firestore collection references
@@ -38,8 +38,7 @@ let unsubscribeFromReporters = null;
 let unsubscribeFromTasksCompletion = null; 
 
 // Global state for tasks completion (client-side cache)
-let completedTasks = {}; // Stores { logType: { taskId: true/false } }
-let selectedLogTypeTasksCompleted = true; // Tracks if all tasks for the *currently selected log type* are completed
+let completedTasks = {}; 
 
 
 // --- Global DOM element references ---
@@ -74,7 +73,8 @@ let searchLogBtn;
 let searchInput;    
 let exportExcelBtn; 
 let editReportersBtn; 
-let tasksButtonFixed; // Renamed to tasksButtonFixed for the permanent button
+let taskButtonsContainer; // Container for multiple task buttons
+let manageTaskSettingsBtn; // New DOM reference for "ניהול הגדרות משימות" button
 
 // Clock DOM references
 let currentTimeDisplay;
@@ -101,15 +101,19 @@ let addReporterBtn;
 let reportersListUl;
 let reporterErrorMessage;
 
+// Custom Task Settings Modal DOM references
+let taskSettingsModal;
+let closeTaskSettingsModalBtn;
+let selectTaskTypeForSettings;
+let currentTasksForSettings;
+let newTaskItemInput;
+let addTaskItemBtn;
+
+
 // Custom Alert DOM references
 let customAlert;
 let customAlertMessage;
 let customAlertCloseBtn;
-
-// Global state for tasks panel hover
-let tasksPanelHoverTimeout;
-const PANEL_OPEN_DELAY = 100; // Small delay before opening on hover
-const PANEL_CLOSE_DELAY = 200; // Delay before closing on mouse leave
 
 
 // --- UI State Management ---
@@ -117,12 +121,11 @@ const showLoginPage = () => {
     if (loginPage) loginPage.classList.remove('hidden');
     if (appContent) {
         appContent.classList.add('hidden');
-        appContent.classList.remove('app-content-shifted'); // Ensure no shift when hidden
+        appContent.classList.remove('app-content-shifted'); 
     }
-    // Hide tasks panel and reporters modal on logout
     if (tasksPanel) tasksPanel.classList.remove('is-open');
     if (reportersModal) reportersModal.classList.add('hidden');
-    // Close header menu on logout
+    if (taskSettingsModal) taskSettingsModal.classList.add('hidden'); // Ensure settings modal is hidden
     if (headerMenu) headerMenu.classList.remove('open');
 };
 
@@ -131,7 +134,6 @@ const showAppContent = () => {
     if (appContent) appContent.classList.remove('hidden');
 };
 
-// Function to show custom alert
 const showCustomAlert = (message) => {
     if (customAlert && customAlertMessage) {
         customAlertMessage.textContent = message;
@@ -139,13 +141,11 @@ const showCustomAlert = (message) => {
     }
 };
 
-// --- Auto-resize Textarea Logic ---
 const autoResizeTextarea = (textarea) => {
     textarea.style.height = 'auto'; 
     textarea.style.height = (textarea.scrollHeight) + 'px'; 
 };
 
-// Sets default date and time in the input fields (used for initial load and after reset)
 const setDefaultDateTime = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -162,13 +162,11 @@ const setDefaultDateTime = () => {
     }
 };
 
-// Function to validate time format (HH:MM)
 const isValidTimeFormat = (timeString) => {
     const pattern = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
     return pattern.test(timeString);
 };
 
-// Function to format date as DD/MM/YYYY
 const formatAsDDMMYYYY = (dateString) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -177,7 +175,6 @@ const formatAsDDMMYYYY = (dateString) => {
     return `${day}/${month}/${year}`;
 };
 
-// Function to sort reports by date (descending) then time (descending) - operates on an array COPY
 const sortChronologically = (arrToSort) => { 
     return [...arrToSort].sort((a, b) => { 
         const dateA = new Date(a.date);
@@ -186,7 +183,6 @@ const sortChronologically = (arrToSort) => {
         if (dateA > dateB) return -1; 
         if (dateA < dateB) return 1;  
 
-        // If dates are the same, sort by time (descending)
         if (a.time > b.time) return -1; 
         if (a.time < b.time) return 1;  
 
@@ -194,7 +190,6 @@ const sortChronologically = (arrToSort) => {
     });
 };
 
-// Renders the table content based on the reports array and current sorting rules
 const renderTable = (searchTerm = '') => {
     if (!tableBody) { 
         console.error('tableBody element not found. Cannot render table.');
@@ -206,9 +201,8 @@ const renderTable = (searchTerm = '') => {
         loadingStateRow.classList.add('hidden');
     }
 
-    let currentDisplayReports = [...reports]; // Start with a copy of the global reports array
+    let currentDisplayReports = [...reports]; 
 
-    // Apply search filter if a search term exists
     if (searchTerm) {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         currentDisplayReports = currentDisplayReports.filter(report => 
@@ -218,22 +212,17 @@ const renderTable = (searchTerm = '') => {
         );
     }
 
-    // After filtering, if we are NOT searching, potentially promote the last added report
     if (lastAddedReportId && !searchTerm) { 
         const lastAddedIndex = currentDisplayReports.findIndex(report => report.id === lastAddedReportId);
         if (lastAddedIndex !== -1) {
             const [topReport] = currentDisplayReports.splice(lastAddedIndex, 1); 
             currentDisplayReports.unshift(topReport); 
         }
-        // Clear lastAddedReportId AFTER it's been used for rendering this cycle
         lastAddedReportId = null; 
     }
     
     if (currentDisplayReports.length === 0) {
         if (emptyStateRow) { 
-            // Update colspan for mobile and desktop views
-            // On desktop: 6 columns (דיווח, תאריך, שעה, מדווח, שיוך, פעולות)
-            // On mobile: 3 columns (דיווח, שעה, פעולות)
             const colspan = window.innerWidth <= 639 ? 3 : 6; 
             emptyStateRow.querySelector('td').setAttribute('colspan', colspan);
 
@@ -268,16 +257,13 @@ const renderTable = (searchTerm = '') => {
     sortedDateKeys.forEach(dateKey => {
         const { reports: reportsForDate, logTypes } = groupedReports.get(dateKey);
         const isToday = dateKey === todayKey;
-        // Only collapse if not searching
         const isCollapsed = searchTerm ? false : collapsedGroups.has(dateKey); 
 
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
         
-        // Colspan for group header: 6 columns on desktop, 3 on mobile
         const headerColspan = window.innerWidth <= 639 ? 3 : 6;
 
-        // Date group header should only display date 
         headerRow.innerHTML = `
             <td colspan="${headerColspan}" class="p-3 font-bold text-[#6D5F53] text-right">
                 <button class="toggle-day-btn text-blue-600 hover:text-blue-800 ml-2" data-toggle-date="${dateKey}">
@@ -293,7 +279,6 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.dataset.contentDate = dateKey; 
 
         const reportsCell = document.createElement('td');
-        // Colspan for reports cell within group: 6 columns on desktop, 3 on mobile
         const reportsCellColspan = window.innerWidth <= 639 ? 3 : 6;
         reportsCell.colSpan = reportsCellColspan;
         reportsCell.className = 'p-0'; 
@@ -312,13 +297,11 @@ const renderTable = (searchTerm = '') => {
             const reportRow = document.createElement('tr');
             reportRow.className = 'hover:bg-[#F8F5F1]';
 
-            // Check if report is older than 48 hours for edit lock 
-            const reportDateTime = new Date(report.timestamp); // Use the timestamp from Firebase
+            const reportDateTime = new Date(report.timestamp); 
             const now = new Date();
             const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
             const canEdit = diffHours < 48;
 
-            // Function to highlight text
             const highlightText = (text, term) => {
                 if (!term) return text;
                 const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -327,10 +310,10 @@ const renderTable = (searchTerm = '') => {
 
             reportRow.innerHTML = `
                 <td class="table-cell">${highlightText(report.description, searchTerm)}</td>
-                <td class="table-cell table-cell-desktop-only">${formatAsDDMMYYYY(report.date)}</td> <!-- Restored for desktop -->
+                <td class="table-cell table-cell-desktop-only">${formatAsDDMMYYYY(report.date)}</td> 
                 <td class="table-cell">${report.time}</td>
                 <td class="table-cell table-cell-desktop-only">${highlightText(report.reporter, searchTerm)}</td>
-                <td class="table-cell table-cell-desktop-only">${highlightText(report.logType, searchTerm)}</td> <!-- Restored for desktop -->
+                <td class="table-cell table-cell-desktop-only">${highlightText(report.logType, searchTerm)}</td> 
                 <td class="table-cell text-center whitespace-nowrap">
                     ${canEdit ? `<button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>` : `<span class="text-gray-400">לא ניתן לערוך</span>`}
                 </td>
@@ -374,7 +357,6 @@ const renderTable = (searchTerm = '') => {
     console.log('Collapsed Groups State:', collapsedGroups);
 };
 
-// Clears the input fields and resets the form to "add new report" mode
 const resetForm = () => {
     if (generalTextInput) { 
         generalTextInput.value = '';
@@ -411,13 +393,12 @@ const resetForm = () => {
     }
 
     if (filterLogType) {
-        filterLogType.value = ""; // Reset log type selection
-        updateTasksButtonState(""); // Update tasks button for empty selection
+        filterLogType.value = ""; 
+        updateTasksButtonStates(); // Update all tasks buttons
     }
-    toggleTasksPanel(false); // Hide tasks panel on form reset
+    toggleTasksPanel(false); 
 };
 
-// Adds a new report to Firestore
 const addReport = async () => { 
     if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage || !reportsCollectionRef) {
         console.error('One or more required input elements or Firebase collection reference are not initialized.');
@@ -472,7 +453,6 @@ const addReport = async () => {
     }
 };
 
-// Updates an existing report in Firestore
 const updateReport = async () => { 
     if (!generalTextInput || !newDateInput || !newTimeInput || !filterReporter || !filterLogType || !inputErrorMessage || !reportsCollectionRef || editingReportIndex === null) {
         console.error('One or more required input elements or Firebase collection reference are not initialized for update, or no report is being edited.');
@@ -517,7 +497,6 @@ const updateReport = async () => {
         return;
     }
 
-    // Check 48-hour edit lock 
     const reportDateTime = new Date(reportToUpdate.timestamp);
     const now = new Date();
     const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
@@ -527,20 +506,18 @@ const updateReport = async () => {
         return;
     }
 
-
     const updatedReportData = {
         description,
         date,
         time,
         reporter,
         logType,
-        // timestamp is NOT updated on edit to preserve original creation time for the 48-hour rule
     };
 
     try {
         const docRef = doc(db, `artifacts/${appId}/public/data/reports`, reportToUpdate.id); 
         await setDoc(docRef, updatedReportData, { merge: true }); 
-        console.log("Document updated with ID: ", reportToUpdate.id);
+        console.log("Document updated with ID: ", docRef.id);
         lastAddedReportId = reportToUpdate.id; 
         collapsedGroups.delete(reportToUpdate.date); 
         resetForm(); 
@@ -554,7 +531,6 @@ const updateReport = async () => {
 
 // --- Auth State Handler ---
 const handleAuthState = async (user) => {
-    // Hide loading state
     if (loadingStateRow) loadingStateRow.classList.add('hidden');
 
     if (user) {
@@ -562,26 +538,21 @@ const handleAuthState = async (user) => {
         console.log('User signed in. UID:', currentUserId);
         console.log('User email:', user.email);
 
-        console.log('User is authenticated. Showing app content.');
         showAppContent(); 
 
-        // Initialize reports collection reference if not already done
         if (!reportsCollectionRef) {
              reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
              console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
         }
-        // Initialize reporters collection reference
         if (!reportersCollectionRef) {
             reportersCollectionRef = collection(db, `artifacts/${appId}/public/data/reporters`);
             console.log('Reporters collection path (PUBLIC):', `artifacts/${appId}/public/data/reporters`);
         }
-        // Initialize tasks completion collection reference
         if (!tasksCompletionCollectionRef) {
             tasksCompletionCollectionRef = doc(db, `artifacts/${appId}/users/${currentUserId}/tasks_completion`, 'status');
             console.log('Tasks completion document path (PRIVATE):', `artifacts/${appId}/users/${currentUserId}/tasks_completion/status`);
         }
        
-        // Set up real-time listener for reports if not active
         if (!unsubscribeFromReports) {
             unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
                 const fetchedReports = [];
@@ -590,32 +561,33 @@ const handleAuthState = async (user) => {
                 });
                 reports = sortChronologically(fetchedReports); 
                 console.log('Reports fetched and sorted:', reports);
-                renderTable(); // Initial render after data fetch
+                renderTable(); 
+                updateTasksButtonStates(); // Re-render/update all task buttons after reports load
             }, (error) => {
                 console.error("Error getting reports in real-time: ", error);
                 inputErrorMessage.textContent = 'שגיאה בטעינת דיווחים: ' + error.message;
             });
         }
 
-        // Set up real-time listener for reporters 
         if (!unsubscribeFromReporters) {
-            unsubscribeFromReporters = onSnapshot(reportersCollectionRef, (snapshot) => {
+            unsubscribeFromReporters = onSnapshot(reportersCollectionRef, async (snapshot) => {
                 const fetchedReporters = [];
                 snapshot.forEach(doc => {
                     fetchedReporters.push(doc.data().name); 
                 });
                 populateReportersDropdown(fetchedReporters);
                 renderReportersInModal(fetchedReporters);
-                // Add default reporters if the collection is empty AND it's a new user/first load
-                if (snapshot.empty && !localStorage.getItem('defaultReportersAdded')) {
-                    addDefaultReportersIfEmpty();
+                
+                // Add default reporters only if the collection is empty AND the flag is not set
+                // Use snapshot.size instead of .empty to be more robust
+                if (snapshot.size === 0 && !localStorage.getItem('defaultReportersAddedOnce')) {
+                    await addDefaultReportersIfEmpty();
                 }
             }, (error) => {
                 console.error("Error getting reporters in real-time: ", error);
             });
         }
 
-        // Set up real-time listener for tasks completion 
         if (!unsubscribeFromTasksCompletion) {
             unsubscribeFromTasksCompletion = onSnapshot(tasksCompletionCollectionRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -625,12 +597,11 @@ const handleAuthState = async (user) => {
                     console.log("No completed tasks data found for user.");
                     completedTasks = {}; 
                 }
-                // Re-render tasks panel if it's open, to reflect updated completion status
                 if (tasksPanel && tasksPanel.classList.contains('is-open')) {
                     const currentLogType = tasksLogTypeDisplay.textContent.replace('משימות עבור ', '');
                     renderTasksPanel(currentLogType);
                 }
-                updateTasksButtonState(filterLogType.value); // Update button state after tasks load
+                updateTasksButtonStates(); 
             }, (error) => {
                 console.error("Error getting tasks completion in real-time: ", error);
             });
@@ -643,7 +614,6 @@ const handleAuthState = async (user) => {
         renderTable(); 
         resetForm(); 
 
-        // Unsubscribe from all listeners on logout
         if (unsubscribeFromReports) unsubscribeFromReports();
         unsubscribeFromReports = null;
         if (unsubscribeFromReporters) unsubscribeFromReporters();
@@ -651,7 +621,6 @@ const handleAuthState = async (user) => {
         if (unsubscribeFromTasksCompletion) unsubscribeFromTasksCompletion();
         unsubscribeFromTasksCompletion = null;
 
-        // Hide and clear search input on logout
         if (searchInput) searchInput.classList.add('hidden'); 
         if (searchInput) searchInput.value = ''; 
         isSearchInputVisible = false;
@@ -660,7 +629,6 @@ const handleAuthState = async (user) => {
 
 // --- Clock Functions ---
 
-// Update current time display
 const updateCurrentTime = () => {
     const now = new Date();
     const hours = now.getHours().toString().padStart(2, '0');
@@ -672,31 +640,28 @@ const updateCurrentTime = () => {
     return now; 
 };
 
-// Update assessment time display
 const updateAssessmentTimeDisplay = () => {
     const now = new Date();
     
     if (assessmentTimeDisplay) {
-        if (!assessmentTimeIsManual) { // Only display "טרם נקבע" if not manually set
+        if (!assessmentTimeIsManual) { 
             assessmentTimeDisplay.textContent = 'טרם נקבע';
             assessmentTimeDisplay.classList.remove('blinking-red'); 
         } else {
             const hours = assessmentTime.getHours().toString().padStart(2, '0');
             const minutes = assessmentTime.getMinutes().toString().padStart(2, '0');
             assessmentTimeDisplay.textContent = `${hours}:${minutes}`;
-            checkBlinkingStatus(); // Continue blinking check if manually set
+            checkBlinkingStatus(); 
         }
     }
 };
 
-// Check and apply blinking status for assessment time
 const checkBlinkingStatus = () => {
     const now = updateCurrentTime(); 
     const diffMs = assessmentTime.getTime() - now.getTime();
     const diffMinutes = diffMs / (1000 * 60);
 
     if (assessmentTimeDisplay) {
-        // Blinking only if time is in the future and within 5 minutes
         if (diffMinutes > 0 && diffMinutes <= 5) { 
             assessmentTimeDisplay.classList.add('blinking-red');
         } else { 
@@ -761,7 +726,6 @@ let currentReporters = [];
 const populateReportersDropdown = (reportersArray) => {
     if (filterReporter) {
         filterReporter.innerHTML = ''; 
-        // Add a default empty option
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'בחר מדווח';
@@ -837,20 +801,18 @@ const addReporterToFirestore = async (name) => {
     }
 
     try {
-        // Use a simple addDoc as long as permissions are correctly set
         await addDoc(reportersCollectionRef, { name: name.trim() });
         console.log(`Reporter "${name}" added.`);
         if (newReporterNameInput) newReporterNameInput.value = '';
         if (reporterErrorMessage) reporterErrorMessage.textContent = '';
     } catch (e) {
         console.error("Error adding reporter: ", e);
-        if (reporterErrorMessage) reporterErrorMessage.textContent = 'שגיאה בהוספת מדווח: ' + e.message;
+        if (reporterErrorMessage) reporterErrorMessage.textContent = `שגיאה בהוספת מדווח: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
     }
 };
 
 const deleteReporterFromFirestore = async (name) => {
     try {
-        // Find the document ID for the reporter by name
         const q = query(reportersCollectionRef, where("name", "==", name));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -864,25 +826,24 @@ const deleteReporterFromFirestore = async (name) => {
         }
     } catch (e) {
         console.error("Error deleting reporter: ", e);
-        if (reporterErrorMessage) reporterErrorMessage.textContent = 'שגיאה במחיקת מדווח: ' + e.message;
+        if (reporterErrorMessage) reporterErrorMessage.textContent = `שגיאה במחיקת מדווח: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
     }
 };
 
-// --- Default Reporters Logic ---
 const addDefaultReportersIfEmpty = async () => {
     try {
         const snapshot = await getDocs(reportersCollectionRef);
         if (snapshot.empty) {
             console.log("Reporters collection is empty. Adding default reporters.");
             const defaultReporters = ["אורי", "שונית", "חיליק"];
-            const batch = writeBatch(db); // Use writeBatch for efficient multiple writes
+            const batch = writeBatch(db); 
             for (const reporterName of defaultReporters) {
-                const newDocRef = doc(reportersCollectionRef); // Create a new document reference with an auto-generated ID
+                const newDocRef = doc(reportersCollectionRef); 
                 batch.set(newDocRef, { name: reporterName });
             }
             await batch.commit();
             console.log("Default reporters added successfully.");
-            localStorage.setItem('defaultReportersAdded', 'true'); // Set flag to prevent re-adding on subsequent loads
+            localStorage.setItem('defaultReportersAddedOnce', 'true'); 
         } else {
             console.log("Reporters collection is not empty, skipping default reporter addition.");
         }
@@ -893,7 +854,6 @@ const addDefaultReportersIfEmpty = async () => {
 
 
 // --- Order of Operations / Tasks Panel ---
-// Dummy data for order of operations. THIS SHOULD BE LOADED FROM A DATABASE/CONFIG.
 const orderOfOperations = {
     "בטחוני": [
         { id: 'sec_task_1', text: 'בדיקת קשר ותקשורת עם מפקדה' },
@@ -924,7 +884,6 @@ const orderOfOperations = {
     ],
 };
 
-// Controls the tasks panel visibility and main content shifting
 const toggleTasksPanel = (open) => { 
     if (tasksPanel && appContent) {
         if (open) {
@@ -937,44 +896,93 @@ const toggleTasksPanel = (open) => {
     }
 };
 
-// Function to update the "משימות" button's color based on completion status of the selected log type
-const updateTasksButtonState = (logType) => {
-    if (!tasksButtonFixed) return; // Use tasksButtonFixed for the permanent button
+// Renders and updates the state of all individual task type buttons
+const updateTasksButtonStates = () => {
+    if (!taskButtonsContainer) return; 
 
-    if (!logType || logType === '') {
-        tasksButtonFixed.classList.remove('completed-tasks');
-        tasksButtonFixed.classList.remove('btn-tasks'); // Remove red/green classes
-        tasksButtonFixed.classList.add('btn-secondary'); // Make it grey/default
-        // tasksButtonFixed.disabled = true; // Button is always enabled to allow opening empty panel
-        return;
-    } else {
-        tasksButtonFixed.classList.remove('btn-secondary'); // Remove grey/default
-        // tasksButtonFixed.disabled = false;
-    }
+    taskButtonsContainer.innerHTML = ''; // Clear existing buttons
 
-    const tasksForType = orderOfOperations[logType] || [];
-    if (tasksForType.length === 0) {
-        tasksButtonFixed.classList.add('completed-tasks'); // Green if no tasks defined
-        tasksButtonFixed.classList.remove('btn-tasks'); // Ensure no red class
-        return;
-    }
+    const allLogTypes = Object.keys(orderOfOperations); 
 
-    selectedLogTypeTasksCompleted = true; // Assume true, then check
-    for (const task of tasksForType) {
-        const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
-        if (!isCompleted) {
-            selectedLogTypeTasksCompleted = false;
-            break;
+    // Filter to only show buttons for log types that currently have reports for today
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+    
+    const relevantReportsToday = reports.filter(report => report.date === todayKey);
+    const activeLogTypesToday = new Set(relevantReportsToday.map(r => r.logType));
+
+    // Also include the currently selected log type, even if no reports yet for it today
+    const logTypesToShow = [];
+    allLogTypes.forEach(type => {
+        // Show button if it has active reports today, OR if it's the currently selected log type in the main form, 
+        // AND it's not already added to the list
+        if ((activeLogTypesToday.has(type) || (filterLogType && filterLogType.value === type)) && !logTypesToShow.includes(type)) {
+            logTypesToShow.push(type);
         }
-    }
+    });
+    
+    const customOrder = ["בטחוני", "שריפה", "נעדר", "שגרה"]; 
+    logTypesToShow.sort((a, b) => {
+        return customOrder.indexOf(a) - customOrder.indexOf(b);
+    });
 
-    if (selectedLogTypeTasksCompleted) {
-        tasksButtonFixed.classList.add('completed-tasks'); // Green
-        tasksButtonFixed.classList.remove('btn-tasks'); // Ensure no red class
-    } else {
-        tasksButtonFixed.classList.remove('completed-tasks'); // Red
-        tasksButtonFixed.classList.add('btn-tasks'); // Ensure red class
-    }
+    logTypesToShow.forEach(logType => {
+        const button = document.createElement('button');
+        button.classList.add('task-type-button'); 
+        button.dataset.logType = logType;
+
+        let buttonText = `${logType}`; // Changed text to just the log type name
+        button.textContent = buttonText;
+
+        const tasksForType = orderOfOperations[logType] || [];
+        let allCompleted = true;
+        
+        // Check if there are any *incomplete* tasks for this type that have related reports today
+        let hasIncompleteTasksAndRelatedReportsToday = false;
+        if (tasksForType.length > 0) {
+            for (const task of tasksForType) {
+                const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
+                if (!isCompleted) {
+                    allCompleted = false;
+                    
+                    // Check if there's any report today related to this logType
+                    const hasReportToday = relevantReportsToday.some(report => report.logType === logType);
+                    if (hasReportToday) {
+                        hasIncompleteTasksAndRelatedReportsToday = true;
+                    }
+                }
+            }
+        } else {
+            allCompleted = true; // If no tasks defined, consider them "completed"
+        }
+
+        // Determine button color based on the new logic
+        if (allCompleted && tasksForType.length > 0) { // All tasks completed for this type, AND there are tasks
+            button.classList.add('completed-tasks'); // Green
+            button.classList.remove('btn-tasks'); // Ensure no red
+        } else if (hasIncompleteTasksAndRelatedReportsToday) { // Has incomplete tasks AND related reports today
+            button.classList.add('btn-tasks'); // Red
+            button.classList.remove('completed-tasks'); // Ensure no green
+        } else {
+            // Default gray/neutral color (already set in CSS)
+            button.classList.remove('btn-tasks');
+            button.classList.remove('completed-tasks');
+        }
+
+        button.addEventListener('click', () => {
+            const isPanelOpenForThisType = tasksPanel.classList.contains('is-open') && 
+                                           tasksLogTypeDisplay.textContent === logType; // Use logType directly here
+            
+            if (isPanelOpenForThisType) {
+                toggleTasksPanel(false); 
+            } else {
+                renderTasksPanel(logType); 
+                toggleTasksPanel(true);    
+            }
+        });
+
+        taskButtonsContainer.appendChild(button);
+    });
 };
 
 
@@ -1008,21 +1016,18 @@ const renderTasksPanel = (logType) => {
             `;
             tasksList.appendChild(taskItemDiv);
 
-            // Add event listener to checkbox
             taskItemDiv.querySelector(`input[type="checkbox"]`).addEventListener('change', (e) => {
                 handleTaskCheckboxChange(e.target.dataset.taskId, e.target.dataset.logType, task.text, e.target.checked);
             });
         });
     }
 
-    // Show/hide "All tasks completed" message
     if (allTasksCompletedForTypeCurrentlyDisplayed && tasksForType.length > 0) {
         allTasksCompletedMessage.classList.remove('hidden');
-        // Do NOT hide the panel here, user might want to see the completed list
     } else {
         allTasksCompletedMessage.classList.add('hidden');
     }
-    updateTasksButtonState(logType); // Update button state after rendering tasks
+    updateTasksButtonStates(); 
 };
 
 const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) => {
@@ -1033,13 +1038,11 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
     const taskReportDescription = `משימת "${taskText}" עבור שיוך "${logType}" ${isChecked ? 'הושלמה' : 'בוטלה'}.`;
     const reportIdPrefix = `task-${logType}-${taskId}`; 
 
-    // Update client-side state
     if (!completedTasks[logType]) {
         completedTasks[logType] = {};
     }
     completedTasks[logType][taskId] = isChecked;
 
-    // Update Firestore for task completion status (private to user)
     try {
         await setDoc(tasksCompletionCollectionRef, completedTasks, { merge: true });
         console.log(`Task completion status updated for ${logType}/${taskId}.`);
@@ -1047,12 +1050,10 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
         console.error("Error updating task completion status:", error);
     }
 
-    // Find if a corresponding report already exists
     const existingTaskReport = reports.find(r => r.description === taskReportDescription && r.isTaskReport && r.taskReportId === reportIdPrefix);
 
     if (isChecked) {
         if (!existingTaskReport) {
-            // Add a new report to the main reports collection
             const newReportData = {
                 description: taskReportDescription,
                 date: date,
@@ -1075,7 +1076,6 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
         }
     } else { 
         if (existingTaskReport) {
-            // Delete the corresponding report from the main reports collection
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id));
                 console.log("Auto-generated task report deleted.");
@@ -1085,7 +1085,6 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
         }
     }
     
-    // Re-render the tasks panel to reflect visual changes and update button state
     renderTasksPanel(logType);
 };
 
@@ -1124,7 +1123,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     searchInput = document.getElementById('searchInput');       
     exportExcelBtn = document.getElementById('exportExcelBtn'); 
     editReportersBtn = document.getElementById('editReportersBtn'); 
-    tasksButtonFixed = document.getElementById('tasksButtonFixed'); // Changed from tasksButton
+    taskButtonsContainer = document.getElementById('taskButtonsContainer'); 
+    manageTaskSettingsBtn = document.getElementById('manageTaskSettingsBtn'); // New DOM reference
 
     // Clock DOM references
     currentTimeDisplay = document.getElementById('currentTimeDisplay');
@@ -1147,6 +1147,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     reportersListUl = document.getElementById('reportersList');
     reporterErrorMessage = document.getElementById('reporterErrorMessage');
 
+    // Custom Task Settings Modal DOM references
+    taskSettingsModal = document.getElementById('taskSettingsModal');
+    closeTaskSettingsModalBtn = document.getElementById('closeTaskSettingsModalBtn');
+    selectTaskTypeForSettings = document.getElementById('selectTaskTypeForSettings');
+    currentTasksForSettings = document.getElementById('currentTasksForSettings');
+    newTaskItemInput = document.getElementById('newTaskItemInput');
+    addTaskItemBtn = document.getElementById('addTaskItemBtn');
+
+
     // Custom Alert DOM references
     customAlert = document.getElementById('customAlert');
     customAlertMessage = document.getElementById('customAlertMessage');
@@ -1161,10 +1170,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Initial state: show loading then login page
     if (loadingStateRow) loadingStateRow.classList.remove('hidden'); 
 
-    // Attempt anonymous sign-in or custom token sign-in on load to bypass login
     try {
         if (initialAuthToken) {
             await signInWithCustomToken(auth, initialAuthToken);
@@ -1184,14 +1191,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     setDefaultDateTime();
     resetForm(); 
 
-    // Initialize clocks
-    // assessmentTime is already initialized with current time. Keep assessmentTimeIsManual as false initially.
-    assessmentTime.setMinutes(assessmentTime.getMinutes() + 30); // Add 30 minutes for a meaningful initial future time
+    assessmentTime.setMinutes(assessmentTime.getMinutes() + 30); 
     assessmentTime.setSeconds(0); 
     assessmentTime.setMilliseconds(0);
-    updateAssessmentTimeDisplay(); // Update display with initial state
-    setInterval(updateCurrentTime, 1000); // Update current time every second
-    setInterval(updateAssessmentTimeDisplay, 1000); // Check assessment time status every second
+    updateAssessmentTimeDisplay(); 
+    setInterval(updateCurrentTime, 1000); 
+    setInterval(updateAssessmentTimeDisplay, 1000); 
 
 
     // --- Login/Logout Event Listeners ---
@@ -1239,7 +1244,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 reports = []; 
                 renderTable(); 
                 resetForm(); 
-                // Hide and clear search input on logout
                 if (searchInput) searchInput.classList.add('hidden'); 
                 if (searchInput) searchInput.value = ''; 
                 isSearchInputVisible = false;
@@ -1247,12 +1251,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.error("Error signing out:", error);
                 loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
             }
-            headerMenu.classList.add('hidden'); // Close menu on logout
+            headerMenu.classList.add('hidden'); 
             headerMenu.classList.remove('open');
         });
     }
 
-    // --- Firebase Auth State Changed Listener ---
     onAuthStateChanged(auth, handleAuthState);
 
 
@@ -1319,7 +1322,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const reportToEdit = reports[index];
                 
-                // Check 48-hour edit lock 
                 const reportDateTime = new Date(reportToEdit.timestamp);
                 const now = new Date();
                 const diffHours = (now.getTime() - reportDateTime.getTime()) / (1000 * 60 * 60);
@@ -1348,8 +1350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (newDateInput) newDateInput.readOnly = false; 
                 if (newTimeInput) newTimeInput.readOnly = false; 
-
-                if (generalTextInput) generalTextInput.focus(); 
+                filterReporter.focus(); 
             }
         });
     } else {
@@ -1385,15 +1386,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Header Menu Event Listeners ---
     if (menuToggleBtn) {
         menuToggleBtn.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent document click from immediately closing
+            event.stopPropagation(); 
             headerMenu.classList.toggle('hidden');
-            headerMenu.classList.toggle('open'); // For transition animation
+            headerMenu.classList.toggle('open'); 
             if (!headerMenu.classList.contains('hidden') && searchInput) {
-                searchInput.classList.add('hidden'); // Ensure search input is hidden by default in menu
+                searchInput.classList.add('hidden'); 
                 isSearchInputVisible = false;
             }
         });
-        // Close menu if clicked outside
         document.addEventListener('click', (event) => {
             if (headerMenu && !headerMenu.contains(event.target) && !menuToggleBtn.contains(event.target)) {
                 headerMenu.classList.add('hidden');
@@ -1404,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (searchLogBtn) {
         searchLogBtn.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent menu from closing on search button click
+            event.stopPropagation(); 
             if (searchInput) {
                 searchInput.classList.toggle('hidden');
                 isSearchInputVisible = !searchInput.classList.contains('hidden');
@@ -1412,17 +1412,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     searchInput.focus();
                 } else {
                     searchInput.value = '';
-                    performSearch(); // Re-render table if search is hidden and cleared
+                    performSearch(); 
                 }
             }
         });
     }
 
-    // Existing exportExcelBtn and editReportersBtn listeners remain, but will close the header menu
     if (exportExcelBtn) {
         exportExcelBtn.addEventListener('click', () => {
             exportReportsToExcel();
-            headerMenu.classList.add('hidden'); // Close menu after selection
+            headerMenu.classList.add('hidden'); 
             headerMenu.classList.remove('open');
         });
     }
@@ -1430,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editReportersBtn) {
         editReportersBtn.addEventListener('click', () => {
             openReportersModal();
-            headerMenu.classList.add('hidden'); // Close menu after selection
+            headerMenu.classList.add('hidden'); 
             headerMenu.classList.remove('open');
         });
     }
@@ -1444,7 +1443,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 reports = []; 
                 renderTable(); 
                 resetForm(); 
-                // Hide and clear search input on logout
                 if (searchInput) searchInput.classList.add('hidden'); 
                 if (searchInput) searchInput.value = ''; 
                 isSearchInputVisible = false;
@@ -1452,64 +1450,150 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.error("Error signing out:", error);
                 loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
             }
-            headerMenu.classList.add('hidden'); // Close menu on logout
+            headerMenu.classList.add('hidden'); 
+            headerMenu.classList.remove('open');
+        });
+    }
+
+    // New: Manage Task Settings button listener
+    if (manageTaskSettingsBtn) {
+        manageTaskSettingsBtn.addEventListener('click', () => {
+            openTaskSettingsModal();
+            headerMenu.classList.add('hidden'); // Close main menu
             headerMenu.classList.remove('open');
         });
     }
 
 
-    // --- Tasks Panel Event Listeners (controlled by fixed button hover) ---
-    if (tasksButtonFixed) {
-        // Add tasks-button-fixed class (already in HTML, but ensuring it's used)
-        // tasksButtonFixed.classList.add('tasks-button-fixed'); // Already in HTML
+    // --- Tasks Panel Event Listeners (controlled by dynamic buttons) ---
+    // Initialize task type buttons initially
+    updateTasksButtonStates(); // Call this once to render all buttons
 
-        // Add hover listeners to the button
-        tasksButtonFixed.addEventListener('mouseenter', () => {
-            clearTimeout(tasksPanelHoverTimeout);
-            tasksPanelHoverTimeout = setTimeout(() => {
-                const selectedLogType = filterLogType.value;
-                if (selectedLogType) { // Open panel even if no tasks are defined for the type
-                    renderTasksPanel(selectedLogType);
-                    toggleTasksPanel(true);
-                } else {
-                    // Do not show alert, just don't open the panel
-                    console.log("No log type selected for tasks. Panel not opened.");
-                }
-            }, PANEL_OPEN_DELAY);
-        });
-        tasksButtonFixed.addEventListener('mouseleave', () => {
-            clearTimeout(tasksPanelHoverTimeout);
-            tasksPanelHoverTimeout = setTimeout(() => toggleTasksPanel(false), PANEL_CLOSE_DELAY);
-        });
+    // Close button inside panel
+    if (closeTasksPanelBtn) {
+        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
     }
-
-    if (tasksPanel) {
-        // Add hover listeners to the panel itself to keep it open
-        tasksPanel.addEventListener('mouseenter', () => {
-            clearTimeout(tasksPanelHoverTimeout); // Keep panel open
-        });
-        tasksPanel.addEventListener('mouseleave', () => {
-            clearTimeout(tasksPanelHoverTimeout);
-            tasksPanelHoverTimeout = setTimeout(() => toggleTasksPanel(false), PANEL_CLOSE_DELAY);
-        });
-
-        // Close button inside panel
-        if (closeTasksPanelBtn) {
-            closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
-        }
-    }
-
-    // When logType changes, render tasks panel but don't open it automatically.
-    // Instead, update the tasks button state immediately.
+    
+    // When logType changes, update the button states
     if (filterLogType) {
         filterLogType.addEventListener('change', (e) => {
             const selectedLogType = e.target.value;
-            updateTasksButtonState(selectedLogType);
-            // Close the panel if log type changes
-            toggleTasksPanel(false); 
+            updateTasksButtonStates(); 
+            if (tasksPanel.classList.contains('is-open')) {
+                if (tasksLogTypeDisplay.textContent !== selectedLogType) { // Compare with actual display text
+                    toggleTasksPanel(false); 
+                }
+            } else {
+            }
+
+            if (!orderOfOperations[selectedLogType] || orderOfOperations[selectedLogType].length === 0) {
+                if (tasksPanel.classList.contains('is-open') && tasksLogTypeDisplay.textContent === selectedLogType) {
+                    toggleTasksPanel(false);
+                }
+            }
         });
     }
-    
+
+    // --- Task Settings Modal Functions (New) ---
+    const openTaskSettingsModal = () => {
+        if (taskSettingsModal) {
+            taskSettingsModal.classList.remove('hidden');
+            // Reset modal content
+            if (selectTaskTypeForSettings) selectTaskTypeForSettings.value = "";
+            if (currentTasksForSettings) currentTasksForSettings.innerHTML = '<p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>';
+            if (newTaskItemInput) newTaskItemInput.value = '';
+            if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
+            if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden');
+        }
+    };
+
+    const closeTaskSettingsModal = () => {
+        if (taskSettingsModal) {
+            taskSettingsModal.classList.add('hidden');
+        }
+    };
+
+    if (closeTaskSettingsModalBtn) {
+        closeTaskSettingsModalBtn.addEventListener('click', closeTaskSettingsModal);
+    }
+
+    if (selectTaskTypeForSettings) {
+        selectTaskTypeForSettings.addEventListener('change', (e) => {
+            const selectedType = e.target.value;
+            if (selectedType && orderOfOperations[selectedType]) {
+                renderCurrentTasksForSettings(selectedType);
+                if (newTaskItemInput) newTaskItemInput.classList.remove('hidden');
+                if (addTaskItemBtn) addTaskItemBtn.classList.remove('hidden');
+            } else {
+                if (currentTasksForSettings) currentTasksForSettings.innerHTML = '<p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>';
+                if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
+                if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden');
+            }
+        });
+    }
+
+    const renderCurrentTasksForSettings = (logType) => {
+        if (!currentTasksForSettings) return;
+        currentTasksForSettings.innerHTML = '';
+        const tasks = orderOfOperations[logType] || [];
+        if (tasks.length === 0) {
+            currentTasksForSettings.innerHTML = `<p class="text-gray-500 text-center">אין משימות מוגדרות עבור ${logType}.</p>`;
+        } else {
+            const ul = document.createElement('ul');
+            ul.className = 'space-y-2';
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
+                li.innerHTML = `
+                    <span>${task.text}</span>
+                    <button data-task-id="${task.id}" data-log-type="${logType}" class="remove-task-item text-red-500 hover:text-red-700 text-sm">הסר</button>
+                `;
+                ul.appendChild(li);
+            });
+            currentTasksForSettings.appendChild(ul);
+
+            currentTasksForSettings.querySelectorAll('.remove-task-item').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const taskIdToRemove = e.target.dataset.taskId;
+                    const logTypeToRemove = e.target.dataset.logType;
+                    removeTaskFromOrderOfOperations(logTypeToRemove, taskIdToRemove);
+                    renderCurrentTasksForSettings(logTypeToRemove); // Re-render the list
+                    updateTasksButtonStates(); // Update main task buttons
+                });
+            });
+        }
+    };
+
+    const removeTaskFromOrderOfOperations = (logType, taskId) => {
+        if (orderOfOperations[logType]) {
+            orderOfOperations[logType] = orderOfOperations[logType].filter(task => task.id !== taskId);
+            console.log(`Task ${taskId} removed from ${logType}. Current tasks:`, orderOfOperations[logType]);
+        }
+    };
+
+    // For now, addTaskItemBtn and newTaskItemInput are for display purposes as static.
+    // To make them functional, you'd need a backend to persist these task definitions.
+    if (addTaskItemBtn) {
+        addTaskItemBtn.addEventListener('click', () => {
+            const selectedType = selectTaskTypeForSettings.value;
+            const newItemText = newTaskItemInput.value.trim();
+            if (selectedType && newItemText) {
+                // This would normally involve adding to a database, not just static object
+                const newId = `manual_task_${Date.now()}`; // Simple ID generation
+                if (!orderOfOperations[selectedType]) {
+                    orderOfOperations[selectedType] = [];
+                }
+                orderOfOperations[selectedType].push({ id: newId, text: newItemText });
+                newTaskItemInput.value = '';
+                renderCurrentTasksForSettings(selectedType); // Re-render the list
+                updateTasksButtonStates(); // Update main task buttons
+                showCustomAlert("המשימה נוספה (באופן מקומי). כדי לשמור לצמיתות נדרש בסיס נתונים.");
+            } else {
+                showCustomAlert("יש לבחור שיוך ולהזין טקסט למשימה.");
+            }
+        });
+    }
+
     // --- Custom Alert Event Listener ---
     if (customAlertCloseBtn) {
         customAlertCloseBtn.addEventListener('click', () => {
@@ -1520,8 +1604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize default date and time, and reset form
     setDefaultDateTime();
     resetForm(); 
-    // Initial update of tasks button state based on default/initial filterLogType value
-    updateTasksButtonState(filterLogType.value); 
+    updateTasksButtonStates(); 
 });
 
 // Update render table on window resize to adjust colspan for empty/loading states
