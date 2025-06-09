@@ -1,6 +1,13 @@
+html, body {
+    height: 100%; /* Ensure html and body take full viewport height */
+    margin: 0;
+}
+
 body {
     font-family: 'Assistant', sans-serif;
     background-color: #FDFBF7;
+    display: flex; /* Make body a flex container */
+    flex-direction: column; /* Stack children vertically */
     overflow-x: hidden; /* Prevent horizontal scroll when panel shifts content */
 }
 .table-cell {
@@ -261,6 +268,7 @@ body {
     transition: background-color 0.3s ease;
     border-radius: 0.5rem;
     font-weight: 700;
+    padding: 0.5rem 1rem; /* Adjust padding for regular buttons */
 }
 .btn-tasks:hover {
     background-color: #dc2626; /* red-600 */
@@ -284,21 +292,48 @@ body {
     opacity: 1;
 }
 
-/* Specific styling for the fixed tasks button */
-.tasks-button-fixed {
-    position: fixed;
-    left: 0; /* Align to the left edge */
-    top: 50%; /* Vertically center */
-    transform: translateY(-50%); /* Adjust for vertical centering */
-    z-index: 50; /* Ensure it's above other content */
-    padding: 0.75rem 0.5rem; /* Adjust padding for a smaller, vertical look */
-    border-top-right-radius: 0.5rem; /* rounded on right side */
-    border-bottom-right-radius: 0.5rem; /* rounded on right side */
+/* Styling for the dynamic tasks buttons container */
+#taskButtonsContainer {
+    position: fixed; /* Changed from absolute to fixed */
+    left: 0; 
+    top: 50%; 
+    transform: translateY(-50%); 
+    z-index: 50; /* Higher z-index to always be on top */
+    display: flex;
+    flex-direction: column; 
+    gap: 0.5rem; 
+}
+
+/* Styling for individual task type buttons */
+.task-type-button {
+    writing-mode: vertical-rl; 
+    text-orientation: mixed; 
+    padding: 0.75rem 0.5rem; 
+    border-top-right-radius: 0.5rem; 
+    border-bottom-right-radius: 0.5rem; 
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    writing-mode: vertical-rl; /* Rotate text for vertical display */
-    text-orientation: mixed; /* Ensure text orientation is correct */
-    display: flex; /* Use flex to center text vertically after rotation */
-    align-items: center; /* Center items vertically */
-    justify-content: center; /* Center items horizontally */
+    font-weight: 700;
+    color: #FFFFFF; 
+    transition: background-color 0.3s ease;
+    border: none; 
+    cursor: pointer;
+    text-align: center;
+    background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
+    color: #6D5F53; /* Default text color for neutral state */
+}
+
+.task-type-button.btn-tasks { /* Red when tasks are not completed */
+    background-color: #ef4444; 
+    color: #FFFFFF; /* Ensure text is white on red */
+}
+.task-type-button.btn-tasks:hover {
+    background-color: #dc2626; 
+}
+.task-type-button.completed-tasks { /* Green when all tasks are completed */
+    background-color: #22c55e; 
+    color: #FFFFFF; /* Ensure text is white on green */
+}
+.task-type-button.completed-tasks:hover {
+    background-color: #16a34a; 
 }
