@@ -618,6 +618,10 @@ const handleAuthState = async (user) => {
                 console.error("Error getting tasks completion in real-time: ", error);
             });
         }
+        // Enable reporters button if user is signed in
+        if (editReportersBtn) {
+            editReportersBtn.disabled = false;
+        }
 
     } else {
         console.log('No user signed in. Showing login page.');
@@ -636,6 +640,11 @@ const handleAuthState = async (user) => {
         if (searchInput) searchInput.classList.add('hidden'); 
         if (searchInput) searchInput.value = ''; 
         isSearchInputVisible = false;
+
+        // Disable reporters button if user is logged out
+        if (editReportersBtn) {
+            editReportersBtn.disabled = true;
+        }
     }
     // Resolve the promise once the initial auth state has been handled
     firebaseAuthReadyResolve();
@@ -805,12 +814,23 @@ const closeReportersModal = () => {
 };
 
 const addReporterToFirestore = async (name) => {
+    // Ensure Firebase references are available and user is authenticated
+    if (!reportersCollectionRef || !auth.currentUser) {
+        const msg = 'שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה. אנא התחבר ונסה שוב.';
+        console.error(msg);
+        showCustomAlert(msg);
+        if (reporterErrorMessage) reporterErrorMessage.textContent = msg;
+        return;
+    }
+
     if (!name || name.trim() === '') {
         if (reporterErrorMessage) reporterErrorMessage.textContent = 'שם המדווח אינו יכול להיות ריק.';
+        showCustomAlert('שם המדווח אינו יכול להיות רישום ריק.'); // Add custom alert
         return;
     }
     if (currentReporters.includes(name.trim())) {
         if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח בשם זה כבר קיים.';
+        showCustomAlert('מדווח בשם זה כבר קיים.'); // Add custom alert
         return;
     }
 
@@ -818,14 +838,24 @@ const addReporterToFirestore = async (name) => {
         await addDoc(reportersCollectionRef, { name: name.trim() });
         console.log(`Reporter "${name}" added.`);
         if (newReporterNameInput) newReporterNameInput.value = '';
-        if (reporterErrorMessage) reporterErrorMessage.textContent = '';
+        if (reporterErrorMessage) reporterErrorMessage.textContent = ''; // Clear error on success
+        showCustomAlert(`המדווח "${name}" נוסף בהצלחה!`); // Success alert
     } catch (e) {
         console.error("Error adding reporter: ", e);
-        if (reporterErrorMessage) reporterErrorMessage.textContent = `שגיאה בהוספת מדווח: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
+        const errorMessage = `שגיאה בהוספת מדווח ל-Firestore: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
+        if (reporterErrorMessage) reporterErrorMessage.textContent = errorMessage;
+        showCustomAlert(errorMessage); // Alert on error
     }
 };
 
 const deleteReporterFromFirestore = async (name) => {
+    // Ensure Firebase references are available and user is authenticated
+    if (!reportersCollectionRef || !auth.currentUser) {
+        const msg = 'שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה למחיקה. אנא התחבר ונסה שוב.';
+        console.error(msg);
+        showCustomAlert(msg);
+        return;
+    }
     try {
         const q = query(reportersCollectionRef, where("name", "==", name));
         const querySnapshot = await getDocs(q);
@@ -834,13 +864,17 @@ const deleteReporterFromFirestore = async (name) => {
             await deleteDoc(doc(db, `artifacts/${appId}/public/data/reporters`, docToDelete.id));
             console.log(`Reporter "${name}" deleted.`);
             if (reporterErrorMessage) reporterErrorMessage.textContent = '';
+            showCustomAlert(`המדווח "${name}" נמחק בהצלחה.`);
         } else {
             console.warn(`Reporter "${name}" not found for deletion.`);
             if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח לא נמצא.';
+            showCustomAlert(`מדווח "${name}" לא נמצא למחיקה.`);
         }
     } catch (e) {
         console.error("Error deleting reporter: ", e);
-        if (reporterErrorMessage) reporterErrorMessage.textContent = `שגיאה במחיקת מדווח: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
+        const errorMessage = `שגיאה במחיקת מדווח מ-Firestore: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
+        if (reporterErrorMessage) reporterErrorMessage.textContent = errorMessage;
+        showCustomAlert(errorMessage);
     }
 };
 
@@ -861,7 +895,9 @@ const addDefaultReportersIfEmpty = async () => {
         } else {
             console.log("Reporters collection is not empty, skipping default reporter addition.");
         }
-    } catch (e) {
+    }
+    // Added catch block for addDefaultReportersIfEmpty for robustness
+    catch (e) {
         console.error("Error checking or adding default reporters:", e);
     }
 };
@@ -1176,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reportersModal = document.getElementById('reportersModal');
     closeReportersModalBtn = document.getElementById('closeReportersModalBtn');
     newReporterNameInput = document.getElementById('newReporterName');
-    addReporterBtn = document.getElementById('addReporterBtn');
+    addReporterBtn = document.getElementById('addReporterBtn'); // Get reference for the addReporterBtn
     reportersListUl = document.getElementById('reportersList');
     reporterErrorMessage = document.getElementById('reporterErrorMessage');
 
@@ -1193,6 +1229,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     customAlert = document.getElementById('customAlert');
     customAlertMessage = document.getElementById('customAlertMessage');
     customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
+
+    // Attach event listener for addReporterBtn
+    // This line ensures that when the addReporterBtn is clicked,
+    // the addReporterToFirestore function is called with the value
+    // from the newReporterNameInput.
+    if (addReporterBtn) { // Make sure the button exists before attaching listener
+        addReporterBtn.addEventListener('click', () => {
+            addReporterToFirestore(newReporterNameInput.value);
+        });
+    } else {
+        console.error('addReporterBtn element not found! Cannot attach event listener.');
+    }
+    
+    // Attach event listener for closeReportersModalBtn
+    if (closeReportersModalBtn) {
+        closeReportersModalBtn.addEventListener('click', closeReportersModal);
+    } else {
+        console.error('closeReportersModalBtn element not found! Cannot attach event listener.');
+    }
 
 
     // --- Firebase Initialization ---
@@ -1590,7 +1645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
             }
 
-            if (!orderOfOperations[selectedLogType] || orderOfOperations[selectedLogType].length === 0) {
+            if (!orderOfOperations[selectedLogType] || orderOfOperations[selectedType].length === 0) {
                 if (tasksPanel.classList.contains('is-open') && tasksLogTypeDisplay.textContent === selectedLogType) {
                     toggleTasksPanel(false);
                 }
@@ -1760,7 +1815,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 }
                 
-                // Convert Excel date (number) to YYYY-MM-DD string
+                // Convert Excel date (number) toXMLHttpRequest-MM-DD string
                 // Excel dates are days since 1900-01-01 (or 1904-01-01 for Mac, usually 1900)
                 if (typeof reportData.date === 'number') {
                     const excelEpoch = new Date('1899-12-30T00:00:00Z'); // Excel's day 1 is 1900-01-01
@@ -1768,10 +1823,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const dateObj = new Date(excelEpoch.getTime() + reportData.date * msPerDay);
                     reportData.date = dateObj.toISOString().split('T')[0];
                 } else if (typeof reportData.date === 'string') {
-                    // Try to parse string dates into YYYY-MM-DD
+                    // Try to parse string dates intoXMLHttpRequest-MM-DD
                     const parsedDate = new Date(reportData.date);
                     if (isNaN(parsedDate.getTime())) {
-                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: YYYY-MM-DD או תאריך אקסל נומרי.`);
+                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש:XMLHttpRequest-MM-DD או תאריך אקסל נומרי.`);
                          isValid = false;
                          break;
                     }
