@@ -380,6 +380,12 @@ const resetForm = () => {
         inputErrorMessage.textContent = '';
     }
     
+    // Hide delete button if it exists
+    const deleteButton = document.getElementById('deleteReportBtn');
+    if (deleteButton && deleteButton.parentNode) {
+        deleteButton.parentNode.removeChild(deleteButton);
+    }
+
     if (dateTimeInputsWrapper) { 
         dateTimeInputsWrapper.classList.add('hidden'); 
     }
@@ -1342,14 +1348,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Show delete button
                 const deleteButton = document.createElement('button');
                 deleteButton.id = 'deleteReportBtn';
-                deleteButton.className = 'btn-secondary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto mt-2';
+                deleteButton.className = 'btn-primary bg-red-500 hover:bg-red-700 font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto mt-2'; // Red styling
                 deleteButton.textContent = 'מחק דיווח';
                 deleteButton.setAttribute('data-id', reportToEdit.id);
-                mainActionBtn.parentNode.insertBefore(deleteButton, cancelEditBtn.nextSibling); // Insert after cancel button
+                // Insert after mainActionBtn, or before cancelEditBtn if cancel is always visible
+                if (mainActionBtn.parentNode) { // Check if parent exists
+                    mainActionBtn.parentNode.insertBefore(deleteButton, cancelEditBtn); 
+                }
+
 
                 deleteButton.addEventListener('click', async () => {
-                    const confirmDelete = confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // Using confirm temporarily
-                    if (confirmDelete) {
+                    // Replace confirm with a custom modal for better UX
+                    const confirmAction = window.confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // Placeholder for custom confirm
+                    if (confirmAction) {
                         await deleteReport(reportToEdit.id);
                         resetForm();
                         // Hide delete button after deletion/cancellation
