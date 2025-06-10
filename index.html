@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>יומן חפ"ק - לפיד</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -17,17 +16,12 @@
             }
         }
     </script>
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for hamburger icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-[#FDFBF7] text-[#4A443E] flex flex-col h-screen overflow-hidden">
-    <!-- overflow-hidden added to body to control horizontal scrolling when panel shifts -->
-
-    <!-- Login Page (hidden by default) -->
     <div id="login-page" class="absolute inset-0 bg-[#FDFBF7] flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-xl shadow-lg ring-1 ring-[#EAE2D9] w-full max-w-sm text-center">
             <h2 class="text-2xl font-bold text-[#6D5F53] mb-6">התחברות ליומן חפ"ק</h2>
@@ -44,37 +38,32 @@
         </div>
     </div>
 
-    <!-- Tasks Panel (fixed, slides from left, controlled by click) -->
     <div id="tasksPanel" class="tasks-panel fixed top-0 left-0 h-full bg-[#F8F5F1] shadow-xl p-4 z-40 transition-transform duration-300 ease-out transform -translate-x-full overflow-y-auto w-64 md:w-80">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-[#6D5F53]">משימות עבור <span id="tasksLogTypeDisplay"></span></h3>
             <button id="closeTasksPanelBtn" class="text-xl font-bold text-[#6D5F53] hover:text-[#4A443E]">&times;</button>
         </div>
         <div id="tasksList" class="space-y-3">
-            <!-- Tasks will be rendered here -->
-        </div>
+            </div>
         <p id="allTasksCompletedMessage" class="text-green-600 text-center mt-6 font-semibold hidden">כל המשימות הושלמו!</p>
     </div>
 
-    <!-- Main Application Content (visible by default) -->
     <div id="app-content" class="container mx-auto p-4 sm:p-6 md:p-8 max-w-5xl flex-grow overflow-y-auto transition-transform duration-300 ease-out"> 
 
         <header class="text-center mb-6 flex justify-between items-center flex-wrap gap-2">
             <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
             <div class="flex gap-2 items-center relative">
-                <!-- Task Buttons (left aligned, vertical stack, fixed positioning for its container) -->
                 <div id="taskButtonsContainer" class="fixed left-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30">
-                    <!-- Dynamic Task buttons will be generated here by script.js -->
-                </div>
+                    </div>
 
-                <!-- Hamburger Menu Toggle Button -->
                 <button id="menuToggleBtn" class="btn-secondary font-bold py-1.5 px-3 rounded-lg shadow text-xl"><i class="fas fa-bars"></i></button>
-                <!-- Dropdown Menu -->
                 <div id="headerMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden origin-top-right transform scale-95 opacity-0 transition-all duration-200 ease-out"
                      role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
+                     <button id="addTaskTypeBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">הוספת סוג משימה</button>
                     <button id="searchLogBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">חיפוש ביומן</button>
                     <input type="text" id="searchInput" class="form-input p-1.5 border rounded-lg text-sm w-full px-4 py-2 mt-1 hidden" placeholder="חפש...">
                     <button id="exportExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייצא לאקסל</button>
+                    <button id="importExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייבוא מאקסל</button>
                     <button id="editReportersBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ערוך מדווחים</button>
                     <button id="manageTaskSettingsBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ניהול הגדרות משימות</button>
                     <button id="logoutBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">התנתק</button>
@@ -82,22 +71,17 @@
             </div>
         </header>
 
-        <!-- Clocks Section -->
         <section class="flex flex-col md:flex-row gap-6 mb-6">
-            <!-- Current Time Clock -->
             <div class="clock-container flex-1">
                 <div class="clock-label">שעה נוכחית</div>
                 <div id="currentTimeDisplay" class="clock-display">00:00:00</div>
             </div>
 
-            <!-- Situation Assessment Clock -->
             <div class="clock-container flex-1">
                 <div class="clock-label">הערכת מצב</div>
                 <div class="flex items-center justify-center gap-4"> 
-                    <button id="assessmentTimeMinusBtn" class="clock-button">-</button> <!-- MINUS on the left -->
-                    <div id="assessmentTimeDisplay" class="clock-display">00:00</div> 
-                    <button id="assessmentTimePlusBtn" class="clock-button">+</button> <!-- PLUS on the right -->
-                </div>
+                    <button id="assessmentTimeMinusBtn" class="clock-button">-</button> <div id="assessmentTimeDisplay" class="clock-display">00:00</div> 
+                    <button id="assessmentTimePlusBtn" class="clock-button">+</button> </div>
             </div>
         </section>
 
@@ -113,8 +97,7 @@
                         
                         <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterReporter" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">מדווח:</label>
                             <select id="filterReporter" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
-                                <!-- Reporters will be dynamically loaded here by script.js -->
-                            </select>
+                                </select>
                         </div>
                         
                         <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterLogType" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">שיוך:</label>
@@ -160,7 +143,6 @@
                     <thead>
                         <tr>
                             <th class="table-cell font-bold text-[#6D5F53]">דיווח</th>
-                            <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only">תאריך</th>
                             <th class="table-cell font-bold text-[#6D5F53]">שעה</th>
                             <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only">שם המדווח</th>
                             <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only">שיוך יומן</th>
@@ -169,10 +151,10 @@
                     </thead>
                     <tbody id="reportTableBody">
                         <tr id="empty-state">
-                            <td colspan="6" class="table-cell text-center text-gray-500 py-8">לא נוספו דיווחים עדיין.</td>
+                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">לא נוספו דיווחים עדיין.</td>
                         </tr>
                         <tr id="loading-state" class="hidden">
-                            <td colspan="6" class="table-cell text-center text-gray-500 py-8">טוען דיווחים...</td>
+                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">טוען דיווחים...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -181,8 +163,7 @@
 
     </div>
 
-    <!-- Reporters Management Modal -->
-    <div id="reportersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div id="reportersModal" class="fixed inset-0 bg-gray-600 bg-opacity50 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
             <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול מדווחים</h3>
             
@@ -195,8 +176,7 @@
             <div class="mb-4">
                 <h4 class="text-lg font-semibold text-[#6D5F53] mb-3">מדווחים קיימים:</h4>
                 <ul id="reportersList" class="border border-[#EAE2D9] rounded-lg bg-[#F8F5F1] max-h-48 overflow-y-auto divide-y divide-[#DCD5CC]">
-                    <!-- Existing reporters will be loaded here -->
-                </ul>
+                    </ul>
             </div>
             
             <button id="closeReportersModalBtn" class="btn-secondary py-2 px-4 rounded-lg font-semibold shadow">סגור</button>
@@ -205,7 +185,6 @@
     </div>
 
 
-    <!-- Tasks Settings Modal (New: for managing static task lists) -->
     <div id="taskSettingsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
             <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול הגדרות משימות</h3>
@@ -235,7 +214,6 @@
     </div>
 
 
-    <!-- Custom Alert Modal (for "no reports to export" etc.) -->
     <div id="customAlert" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-6 rounded-lg shadow-lg text-center">
             <p id="customAlertMessage" class="text-lg font-semibold text-[#6D5F53] mb-4"></p>
@@ -244,10 +222,8 @@
     </div>
 
 
-    <!-- Firebase services will now be imported from firebase.js -->
     <script type="module" src="firebase.js"></script>
     
-    <!-- Custom JavaScript -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
