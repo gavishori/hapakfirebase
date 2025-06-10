@@ -1,339 +1,378 @@
-html, body {
-    height: 100%; /* Ensure html and body take full viewport height */
-    margin: 0;
-}
+/* style.css */
 
+/* General Styles */
 body {
     font-family: 'Assistant', sans-serif;
     background-color: #FDFBF7;
-    display: flex; /* Make body a flex container */
-    flex-direction: column; /* Stack children vertically */
-    overflow-x: hidden; /* Prevent horizontal scroll when panel shifts content */
-}
-.table-cell {
-    padding: 12px 16px;
-    text-align: right;
-    border-bottom: 1px solid #EAE2D9;
-    vertical-align: middle;
-}
-/* Remove default border from inner table cells for cleaner look */
-.collapsible-content table .table-cell {
-    border-bottom: none;
-}
-.collapsible-content table tbody tr:last-child .table-cell {
-    border-bottom: 1px solid #EAE2D9; /* Add border to last row of inner table */
+    color: #4A443E;
+    overflow-x: auto; /* Ensure horizontal scrollbar is always visible */
 }
 
-.form-input, .form-select, .form-textarea {
-    border-color: #DCD5CC;
-    transition: all 0.3s ease;
-    /* Ensure a sensible default min-height for textarea */
-    min-height: calc(1.5em * 3 + 1rem); /* Roughly 3 lines height + padding for default rows="3" */
-    overflow-y: hidden; /* Important for auto-resize */
-    border-radius: 0.5rem; /* rounded-lg equivalent for default form inputs */
+.container {
+    max-width: 1200px; /* Increased max-width for better layout */
+    margin: 0 auto;
+    padding: 1rem;
 }
-.form-input:focus, .form-select:focus, .form-textarea:focus {
+
+/* Form Input Styles */
+.form-input, .form-textarea, .form-select {
+    border: 1px solid #EAE2D9;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    width: 100%;
+    font-size: 1rem;
+    color: #4A443E;
+    background-color: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
     border-color: #B8A692;
-    box-shadow: 0 0 0 2px rgba(184, 166, 146, 0.2);
-    outline: none;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(184, 166, 146, 0.25);
 }
+
+.form-textarea {
+    resize: vertical;
+}
+
+.form-input-group {
+    margin-bottom: 1.5rem;
+}
+
+/* Button Styles */
 .btn-primary {
     background-color: #8C7A6B;
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-size: 1rem;
 }
+
 .btn-primary:hover {
-    background-color: #736357;
+    background-color: #6D5F53;
 }
+
 .btn-secondary {
-    background-color: #EAE2D9;
-    color: #6D5F53;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
+    background-color: #F8F5F1;
+    color: #4A443E;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    border: 1px solid #EAE2D9;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-size: 1rem;
 }
+
 .btn-secondary:hover {
+    background-color: #EAE2D9;
+}
+
+/* Table Styles */
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+th, td {
+    padding: 0.75rem;
+    text-align: right;
+    border-bottom: 1px solid #EAE2D9;
+}
+
+th {
+    background-color: #F8F5F1;
+    font-weight: 600;
+}
+
+/* Clock Styles */
+.clock-container {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    text-align: center;
+}
+
+.clock-label {
+    font-size: 0.875rem;
+    color: #6D5F53;
+    margin-bottom: 0.5rem;
+}
+
+.clock-display {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #4A443E;
+}
+
+.clock-button {
+    background-color: #EAE2D9;
+    color: #4A443E;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.clock-button:hover {
     background-color: #DCD5CC;
 }
-/* Refined edit-mode styling for textarea: ensures a minimum height and allows manual resize */
-.form-textarea.edit-mode-fixed-height {
-    min-height: calc(1.5em * 5 + 1rem); /* Ensure a minimum height for edit mode, matching rows="5" */
-    resize: vertical; /* Allow manual vertical resize */
-    /* REMOVED height: auto !important; to prevent conflict with JS dynamic sizing */
+
+/* Task Panel Styles */
+.tasks-panel {
+    background-color: #F8F5F1;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    z-index: 10;
+    overflow-y: auto;
+    max-width: 300px;
 }
 
-/* Clock specific styles */
-.clock-container {
-    background-color: #FFF;
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
-    padding: 0.5rem 0.75rem; /* Reduced padding */
-    border: 1px solid #EAE2D9; /* ring-1 ring-[#EAE2D9] */
-    margin-top: 1rem; /* Adjusted margin-top */
-    text-align: center;
-    display: flex; /* Use flexbox for vertical alignment */
-    flex-direction: column; /* Stack children vertically */
-    justify-content: center; /* Center content vertically */
-    align-items: center; /* Center content horizontally */
-}
-.clock-display {
-    font-size: 2.5rem; /* text-4xl */
-    font-weight: 700; /* font-bold */
-    color: #6D5F53;
-    /* margin-bottom: 0.25rem; */ /* Removed margin-bottom here as it's now in a flex row with buttons */
-}
-.clock-label {
-    font-size: 1.25rem; /* text-xl */
-    font-weight: 600; /* font-semibold */
-    color: #6D5F53;
-    margin-bottom: 0.125rem; /* Reduced margin-bottom */
-}
-.clock-button {
-    background-color: #8C7A6B;
-    color: #FFFFFF;
-    font-weight: 700; /* font-bold */
-    padding: 0.4rem 0.8rem; /* Adjusted padding */
+/* Header Menu Styles */
+#headerMenu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border: 1px solid #EAE2D9;
     border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    z-index: 20;
+    padding: 0.5rem 0;
+    min-width: 160px;
+}
+
+#headerMenu button {
+    display: block;
+    width: 100%;
+    text-align: right;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    color: #4A443E;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+
+#headerMenu button:hover {
+    background-color: #EAE2D9;
+}
+
+/* Modal Styles */
+#reportersModal, #taskSettingsModal, #customAlert {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    overflow: auto; /* Allow scrolling if modal content is too long */
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .container {
+        padding: 0.5rem;
+    }
+
+    .clock-container {
+        margin-bottom: 1rem;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .table-cell-desktop-only {
+        display: none;
+    }
+
+    #taskButtonsContainer {
+        left: 0.5rem; /* Adjust position on smaller screens */
+    }
+}
+
+/* Specific adjustments for the report table */
+#reportTableBody tr:nth-child(even) {
+    background-color: #F8F5F1;
+}
+
+#reportTableBody tr:hover {
+    background-color: #EAE2D9;
     transition: background-color 0.3s ease;
 }
-.clock-button:hover {
-    background-color: #736357;
-}
 
-/* Blinking animation */
-@keyframes blinker {
-    50% { opacity: 0; }
-}
-.blinking-red {
-    color: #ef4444; /* red-500 */
-    animation: blinker 1s linear infinite;
-}
-
-/* Highlight for search results */
-.highlight {
-    background-color: yellow;
-    padding: 1px 2px;
-    border-radius: 3px;
-}
-
-/* Aligning form elements */
-.form-row-aligned {
+/* Styling for the fixed task buttons */
+#taskButtonsContainer {
     display: flex;
     flex-direction: column;
-    gap: 1rem; /* Space between elements in column */
-    align-items: flex-start; /* Align labels/inputs to the start */
-}
-@media (min-width: 640px) { /* sm breakpoint */
-    .form-row-aligned {
-        flex-direction: row;
-        align-items: flex-end; /* Align to bottom for row layout */
-    }
-    .form-input-group {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end; /* Push content to bottom */
-    }
-    /* Adjust textarea height to match group of two selects */
-    .form-textarea-aligned {
-        height: 5.5rem; /* Approximate height of two selects + labels + margins */
-    }
+    gap: 0.5rem;
+    z-index: 40; /* Ensure it's above other content */
 }
 
-/* --- New Styles for Mobile Responsiveness and Tasks Panel --- */
-
-/* Hide columns on mobile for better readability */
-@media (max-width: 639px) { /* Targets screens smaller than 640px */
-    .table-cell-desktop-only {
-        display: none;
-    }
-    /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        colspan: 3;
-    }
-    .table-cell-mobile-only {
-        display: table-cell; /* Ensure this is visible on mobile */
-    }
-}
-
-/* Ensure mobile-only cells are hidden on desktop */
-@media (min-width: 640px) {
-    .table-cell-mobile-only {
-        display: none;
-    }
-    .table-cell-desktop-only {
-        display: table-cell; /* Ensure these are visible on desktop */
-    }
-    /* Reset colspan for desktop (6 visible columns) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        colspan: 6;
-    }
-}
-
-
-/* Tasks Panel Styling */
-.tasks-panel {
-    position: fixed;
-    left: 0; /* Aligned to the left edge */
-    top: 0;
-    height: 100%;
-    width: 250px; /* Default width */
-    max-width: 90%; /* Max width on smaller screens */
-    background-color: #F8F5F1;
-    border-right: 1px solid #DCD5CC;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-    transform: translateX(-100%); /* Start off-screen to the left */
-    transition: transform 0.3s ease-out; /* Smooth transition */
-    z-index: 45; /* Below the button but above main content */
-    padding: 1rem; /* Adjusted padding */
-}
-.tasks-panel.is-open {
-    transform: translateX(0); /* Slide in to be fully visible */
-}
-
-/* Main content shifting when tasks panel is open */
-#app-content.app-content-shifted {
-    transform: translateX(250px); /* Push app-content to the right by panel's width */
-    /* Add a transition to app-content for smooth movement */
-    transition: transform 0.3s ease-out;
-}
-@media (min-width: 768px) { /* md breakpoint and up */
-    .tasks-panel {
-        width: 300px; /* Wider on desktop */
-    }
-    #app-content.app-content-shifted {
-        transform: translateX(300px); /* Adjust shift for wider panel */
-    }
-}
-
-
-.task-item {
-    display: flex;
-    align-items: center;
+#taskButtonsContainer button {
     padding: 0.5rem;
-    background-color: #FFFFFF;
     border-radius: 0.5rem;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    transition: background-color 0.2s ease;
-}
-.task-item:hover {
-    background-color: #EAE2D9;
-}
-.task-item.highlight-completed {
-    background-color: #DCD5CC; /* Gray background */
-    color: #6D5F53;
-    text-decoration: line-through; /* Strikethrough */
-}
-.task-item input[type="checkbox"] {
-    margin-right: 0.75rem; /* Space between checkbox and text */
-    min-width: 1.25rem; /* Ensure checkbox is not too small */
-    min-height: 1.25rem;
     cursor: pointer;
-}
-
-/* Reporters Modal Styling */
-#reportersModal .reporters-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
-}
-#reportersModal .reporters-list-item:hover {
-    background-color: #EAE2D9;
-}
-#reportersModal .reporters-list-item button {
-    background-color: #ef4444; /* red-500 */
-    color: white;
-    padding: 0.25rem 0.6rem;
-    border-radius: 0.375rem; /* rounded-md */
-    font-size: 0.8rem;
-    font-weight: 600;
     transition: background-color 0.3s ease;
-}
-#reportersModal .reporters-list-item button:hover {
-    background-color: #dc2626; /* red-600 */
-}
-
-/* Custom Alert Modal */
-#customAlert > div {
-    border-radius: 0.75rem; /* rounded-xl */
-}
-
-/* Header Buttons Styling (including new Tasks button) */
-.btn-tasks {
-    background-color: #ef4444; /* red-500 */
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem;
-    font-weight: 700;
-    padding: 0.5rem 1rem; /* Adjust padding for regular buttons */
-}
-.btn-tasks:hover {
-    background-color: #dc2626; /* red-600 */
-}
-.btn-tasks.completed-tasks {
-    background-color: #22c55e; /* green-500 */
-}
-.btn-tasks.completed-tasks:hover {
-    background-color: #16a34a; /* green-600 */
-}
-
-/* Header Menu Styling */
-#headerMenu {
-    top: 100%; /* Position below the toggle button */
-    right: 0; /* Align to the right of its parent (flex item) */
-    min-width: 150px; /* Adjust as needed */
-}
-#headerMenu.open {
-    display: block;
-    transform: scale(1) translate(0, 0); /* Ensure correct animation */
-    opacity: 1;
-}
-
-/* Styling for the dynamic tasks buttons container */
-#taskButtonsContainer {
-    position: fixed; /* Changed from absolute to fixed */
-    left: 0; 
-    top: 50%; 
-    transform: translateY(-50%); 
-    z-index: 50; /* Higher z-index to always be on top */
-    display: flex;
-    flex-direction: column; 
-    gap: 0.5rem; 
-}
-
-/* Styling for individual task type buttons */
-.task-type-button {
-    writing-mode: vertical-rl; 
-    text-orientation: mixed; 
-    padding: 0.75rem 0.5rem; 
-    border-top-right-radius: 0.5rem; 
-    border-bottom-right-radius: 0.5rem; 
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    font-weight: 700;
-    color: #FFFFFF; 
-    transition: background-color 0.3s ease;
-    border: none; 
-    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 0.875rem;
+    min-width: 60px; /* Minimum width for the buttons */
     text-align: center;
-    background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
-    color: #6D5F53; /* Default text color for neutral state */
+    color: #4A443E;
+    background-color: #F8F5F1;
+    white-space: nowrap; /* Prevent text from wrapping */
+    overflow: hidden; /* Hide overflowing text */
+    text-overflow: ellipsis; /* Add ellipsis for long text */
 }
 
-.task-type-button.btn-tasks { /* Red when tasks are not completed */
-    background-color: #ef4444; 
-    color: #FFFFFF; /* Ensure text is white on red */
+#taskButtonsContainer button.active {
+    background-color: #8C7A6B;
+    color: white;
 }
-.task-type-button.btn-tasks:hover {
-    background-color: #dc2626; 
+
+#taskButtonsContainer button.red {
+    background-color: #dc2626; /* Red for urgent */
+    color: white;
 }
-.task-type-button.completed-tasks { /* Green when all tasks are completed */
-    background-color: #22c55e; 
-    color: #FFFFFF; /* Ensure text is white on green */
+
+#taskButtonsContainer button.green {
+    background-color: #16a34a; /* Green for completed */
+    color: white;
 }
-.task-type-button.completed-tasks:hover {
-    background-color: #16a34a; 
+
+/* Style for the hamburger menu button */
+#menuToggleBtn {
+    background-color: #F8F5F1;
+    color: #4A443E;
+    border: 1px solid #EAE2D9;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
+#menuToggleBtn:hover {
+    background-color: #EAE2D9;
+}
+
+/* Style for the input error message */
+#inputErrorMessage {
+    color: #dc2626;
+    text-align: center;
+    margin-top: 0.5rem;
+    min-height: 1.5rem; /* Ensure space is reserved even when empty */
+}
+
+/* Style for the date and time inputs wrapper */
+#dateTimeInputsWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#dateTimeInputsWrapper label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    color: #6D5F53;
+}
+
+#dateTimeInputsWrapper input {
+    padding: 0.5rem;
+    border: 1px solid #EAE2D9;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+}
+
+/* Style for the general text input */
+#generalTextInput {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #EAE2D9;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    resize: vertical;
+}
+
+/* Style for the reporters list */
+#reportersList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#reportersList li {
+    padding: 0.75rem;
+    text-align: right;
+    border-bottom: 1px solid #EAE2D9;
+}
+
+#reportersList li:last-child {
+    border-bottom: none;
+}
+
+/* Style for the task settings */
+#currentTasksForSettings {
+    padding: 0.75rem;
+    border: 1px solid #EAE2D9;
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+/* Style for the custom alert */
+#customAlert {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    overflow: auto; /* Allow scrolling if modal content is too long */
+}
+
+#customAlert .bg-white {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+}
+
+#customAlertMessage {
+    font-size: 1.25rem;
+    color: #4A443E;
+    margin-bottom: 1rem;
+}
+
+#customAlertCloseBtn {
+    background-color: #8C7A6B;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 2px 4px rgb
