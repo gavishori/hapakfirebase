@@ -223,7 +223,7 @@ const renderTable = (searchTerm = '') => {
     
     if (currentDisplayReports.length === 0) {
         if (emptyStateRow) { 
-            const colspan = window.innerWidth <= 639 ? 3 : 6; 
+            const colspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan: דיווח, שעה, פעולות (mobile) / 5 cols (desktop)
             emptyStateRow.querySelector('td').setAttribute('colspan', colspan);
 
             emptyStateRow.classList.remove('hidden'); 
@@ -262,7 +262,7 @@ const renderTable = (searchTerm = '') => {
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
         
-        const headerColspan = window.innerWidth <= 639 ? 3 : 6;
+        const headerColspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan
 
         headerRow.innerHTML = `
             <td colspan="${headerColspan}" class="p-3 font-bold text-[#6D5F53] text-right">
@@ -279,7 +279,7 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.dataset.contentDate = dateKey; 
 
         const reportsCell = document.createElement('td');
-        const reportsCellColspan = window.innerWidth <= 639 ? 3 : 6;
+        const reportsCellColspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan
         reportsCell.colSpan = reportsCellColspan;
         reportsCell.className = 'p-0'; 
 
@@ -310,8 +310,7 @@ const renderTable = (searchTerm = '') => {
 
             reportRow.innerHTML = `
                 <td class="table-cell">${highlightText(report.description, searchTerm)}</td>
-                <td class="table-cell table-cell-desktop-only">${formatAsDDMMYYYY(report.date)}</td> 
-                <td class="table-cell">${report.time}</td>
+                <td class="table-cell">${report.time}</td> <!-- Moved time here -->
                 <td class="table-cell table-cell-desktop-only">${highlightText(report.reporter, searchTerm)}</td>
                 <td class="table-cell table-cell-desktop-only">${highlightText(report.logType, searchTerm)}</td> 
                 <td class="table-cell text-center whitespace-nowrap">
@@ -1426,6 +1425,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    if (importExcelBtn) { // New: Import Excel button listener
+        importExcelBtn.addEventListener('click', () => {
+            headerMenu.classList.add('hidden'); // Close main menu
+            headerMenu.classList.remove('open');
+            // Create a file input dynamically and click it
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.xlsx, .xls';
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    importReportsFromExcel(file);
+                }
+            };
+            fileInput.click();
+        });
+    }
+
     if (editReportersBtn) {
         editReportersBtn.addEventListener('click', () => {
             openReportersModal();
@@ -1600,6 +1617,118 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (customAlert) customAlert.classList.add('hidden');
         });
     }
+
+    // --- Import Excel Functionality ---
+    const importReportsFromExcel = (file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (json.length === 0) {
+                showCustomAlert('קובץ האקסל ריק או לא מכיל נתונים.');
+                return;
+            }
+
+            const headerRow = json[0];
+            const dataRows = json.slice(1);
+
+            const fieldMap = {
+                "דיווח": "description",
+                "תאריך": "date",
+                "שעה": "time",
+                "שם המדווח": "reporter",
+                "שיוך יומן": "logType"
+            };
+
+            const newReports = [];
+            let isValid = true;
+
+            for (const row of dataRows) {
+                if (row.length === 0 || row.every(cell => cell === undefined || cell === '')) {
+                    continue; // Skip empty rows
+                }
+
+                const reportData = {};
+                for (let i = 0; i < headerRow.length; i++) {
+                    const header = headerRow[i];
+                    const field = fieldMap[header];
+                    if (field) {
+                        reportData[field] = row[i];
+                    }
+                }
+
+                // Validate required fields and format
+                if (!reportData.description || !reportData.date || !reportData.time || !reportData.reporter || !reportData.logType) {
+                    showCustomAlert('שגיאת ייבוא: וודא שכל העמודות הנדרשות (דיווח, תאריך, שעה, שם המדווח, שיוך יומן) קיימות ומלאות בכל שורה.');
+                    isValid = false;
+                    break;
+                }
+                if (!isValidTimeFormat(reportData.time)) {
+                    showCustomAlert(`שגיאת ייבוא: פורמט שעה שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: HH:MM.`);
+                    isValid = false;
+                    break;
+                }
+                
+                // Convert Excel date (number) to YYYY-MM-DD string
+                // Excel dates are days since 1900-01-01 (or 1904-01-01 for Mac, usually 1900)
+                if (typeof reportData.date === 'number') {
+                    const excelEpoch = new Date('1899-12-30T00:00:00Z'); // Excel's day 1 is 1900-01-01
+                    const msPerDay = 24 * 60 * 60 * 1000;
+                    const dateObj = new Date(excelEpoch.getTime() + reportData.date * msPerDay);
+                    reportData.date = dateObj.toISOString().split('T')[0];
+                } else if (typeof reportData.date === 'string') {
+                    // Try to parse string dates into YYYY-MM-DD
+                    const parsedDate = new Date(reportData.date);
+                    if (isNaN(parsedDate.getTime())) {
+                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: YYYY-MM-DD או תאריך אקסל נומרי.`);
+                         isValid = false;
+                         break;
+                    }
+                    reportData.date = parsedDate.toISOString().split('T')[0];
+                } else {
+                    showCustomAlert(`שגיאת ייבוא: פורמט תאריך לא נתמך בשורה עבור דיווח "${reportData.description}".`);
+                    isValid = false;
+                    break;
+                }
+
+                newReports.push({
+                    description: String(reportData.description), // Ensure string
+                    date: reportData.date,
+                    time: String(reportData.time),
+                    reporter: String(reportData.reporter),
+                    logType: String(reportData.logType),
+                    creatorId: currentUserId,
+                    timestamp: new Date().toISOString() // Current time for timestamp
+                });
+            }
+
+            if (!isValid) return; // Stop if validation failed
+
+            if (newReports.length > 0) {
+                const batch = writeBatch(db);
+                newReports.forEach(report => {
+                    const newDocRef = doc(reportsCollectionRef); // Auto-generate ID
+                    batch.set(newDocRef, report);
+                });
+
+                try {
+                    batch.commit();
+                    showCustomAlert(`ייבוא הושלם! נוספו ${newReports.length} דיווחים.`);
+                } catch (e) {
+                    console.error("Error writing batch to Firestore:", e);
+                    showCustomAlert(`שגיאה בשמירת דיווחים ל-Firebase: ${e.message}. וודא הרשאות כתיבה.`);
+                }
+            } else {
+                showCustomAlert('לא נמצאו דיווחים חוקיים לייבוא בקובץ.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
 
     // Initialize default date and time, and reset form
     setDefaultDateTime();
