@@ -1339,6 +1339,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (mainActionBtn) mainActionBtn.textContent = 'עדכן דיווח'; 
                 if (cancelEditBtn) cancelEditBtn.classList.remove('hidden'); 
                 
+                // Show delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.id = 'deleteReportBtn';
+                deleteButton.className = 'btn-secondary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto mt-2';
+                deleteButton.textContent = 'מחק דיווח';
+                deleteButton.setAttribute('data-id', reportToEdit.id);
+                mainActionBtn.parentNode.insertBefore(deleteButton, cancelEditBtn.nextSibling); // Insert after cancel button
+
+                deleteButton.addEventListener('click', async () => {
+                    const confirmDelete = confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // Using confirm temporarily
+                    if (confirmDelete) {
+                        await deleteReport(reportToEdit.id);
+                        resetForm();
+                        // Hide delete button after deletion/cancellation
+                        if (deleteButton.parentNode) deleteButton.parentNode.removeChild(deleteButton);
+                    }
+                });
+
+
                 if (dateTimeInputsWrapper) dateTimeInputsWrapper.classList.remove('hidden'); 
 
                 if (generalTextInput) {
@@ -1355,6 +1374,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         console.error('tableBody element not found! Cannot attach event delegation for edit.');
     }
+
+    // --- Delete Report Functionality ---
+    const deleteReport = async (reportId) => {
+        try {
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, reportId));
+            console.log("Document successfully deleted!");
+            showCustomAlert('הדיווח נמחק בהצלחה!');
+            // onSnapshot will re-render table automatically
+        } catch (error) {
+            console.error("Error removing document: ", error);
+            showCustomAlert(`שגיאה במחיקת הדיווח: ${error.message}`);
+        }
+    };
+
 
     // --- Clock Event Listeners ---
     if (assessmentTimePlusBtn) {
