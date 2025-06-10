@@ -1,3 +1,4 @@
+// script.js
 // Global variables for App State
 let reports = []; 
 let editingReportIndex = null; 
@@ -72,6 +73,7 @@ let headerMenu;
 let searchLogBtn;   
 let searchInput;    
 let exportExcelBtn; 
+let importExcelBtn; // Added import button reference
 let editReportersBtn; 
 let taskButtonsContainer; // Container for multiple task buttons
 let manageTaskSettingsBtn; // New DOM reference for "ניהול הגדרות משימות" button
@@ -603,7 +605,7 @@ const handleAuthState = async (user) => {
                     completedTasks = {}; 
                 }
                 if (tasksPanel && tasksPanel.classList.contains('is-open')) {
-                    const currentLogType = tasksLogTypeDisplay.textContent.replace('משימות עבור ', '');
+                    const currentLogType = tasksLogTypeDisplay.textContent; // Use content directly
                     renderTasksPanel(currentLogType);
                 }
                 updateTasksButtonStates(); 
@@ -1055,7 +1057,12 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
         console.error("Error updating task completion status:", error);
     }
 
-    const existingTaskReport = reports.find(r => r.description === taskReportDescription && r.isTaskReport && r.taskReportId === reportIdPrefix);
+    // Find if a report for this specific task and status change already exists
+    const existingTaskReport = reports.find(r => 
+        r.isTaskReport && 
+        r.taskReportId === reportIdPrefix &&
+        r.description === taskReportDescription // Ensure exact match for the status (completed/cancelled)
+    );
 
     if (isChecked) {
         if (!existingTaskReport) {
@@ -1077,13 +1084,26 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
                 console.error("Error adding auto-generated task report: ", e);
             }
         } else {
-            console.log("Task report already exists, no new report added.");
+            console.log("Task report already exists for completion, no new report added.");
+            // Optionally update timestamp if you want "last completion time"
+            // try {
+            //     await setDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id), 
+            //                  { timestamp: new Date().toISOString() }, { merge: true });
+            //     console.log("Existing task report timestamp updated.");
+            // } catch (e) {
+            //     console.error("Error updating existing task report timestamp: ", e);
+            // }
         }
-    } else { 
-        if (existingTaskReport) {
+    } else { // Task was unchecked
+        // Find any existing report for this task, regardless of its 'completed' status text
+        const existingTaskReportForDeletion = reports.find(r => 
+            r.isTaskReport && 
+            r.taskReportId === reportIdPrefix
+        );
+        if (existingTaskReportForDeletion) {
             try {
-                await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id));
-                console.log("Auto-generated task report deleted.");
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReportForDeletion.id));
+                console.log("Auto-generated task report deleted (task unchecked).");
             } catch (e) {
                 console.error("Error deleting auto-generated task report: ", e);
             }
@@ -1127,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     searchLogBtn = document.getElementById('searchLogBtn');     
     searchInput = document.getElementById('searchInput');       
     exportExcelBtn = document.getElementById('exportExcelBtn'); 
+    importExcelBtn = document.getElementById('importExcelBtn'); // Get reference for import button
     editReportersBtn = document.getElementById('editReportersBtn'); 
     taskButtonsContainer = document.getElementById('taskButtonsContainer'); 
     manageTaskSettingsBtn = document.getElementById('manageTaskSettingsBtn'); // New DOM reference
@@ -1784,3 +1805,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.addEventListener('resize', () => {
     renderTable(searchInput ? searchInput.value.trim() : '');
 });
+
