@@ -1,3 +1,4 @@
+/* style.css */
 html, body {
     height: 100%; /* Ensure html and body take full viewport height */
     margin: 0;
@@ -314,13 +315,12 @@ body {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
     font-weight: 700;
-    color: #FFFFFF; 
+    color: #6D5F53; /* Default text color for neutral state */
     transition: background-color 0.3s ease;
     border: none; 
     cursor: pointer;
     text-align: center;
     background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
-    color: #6D5F53; /* Default text color for neutral state */
 }
 
 .task-type-button.btn-tasks { /* Red when tasks are not completed */
@@ -337,3 +337,4 @@ body {
 .task-type-button.completed-tasks:hover {
     background-color: #16a34a; 
 }
+
