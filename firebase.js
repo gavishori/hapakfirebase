@@ -27,7 +27,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC2o9IuXKBuYsbf_tSWdAPRhZMycMvOwG4rc",
+  apiKey: "AIzaSyC2o9IuXKBuYsbf_tSWdAPRhZMyvOwG4rc",
   authDomain: "hapak-lappid.firebaseapp.com",
   projectId: "hapak-lappid",
   storageBucket: "hapak-lappid.firebasestorage.app",
