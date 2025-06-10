@@ -1,4 +1,3 @@
-// script.js
 // Global variables for App State
 let reports = []; 
 let editingReportIndex = null; 
@@ -40,6 +39,12 @@ let unsubscribeFromTasksCompletion = null;
 
 // Global state for tasks completion (client-side cache)
 let completedTasks = {}; 
+
+// New global promise to signal when Firebase auth state is initially determined
+let firebaseAuthReadyResolve;
+const firebaseAuthReady = new Promise(resolve => {
+    firebaseAuthReadyResolve = resolve;
+});
 
 
 // --- Global DOM element references ---
@@ -476,7 +481,7 @@ const updateReport = async () => {
     const logType = filterLogType.value;   
 
     if (!description || !date || !time) { 
-        inputErrorMessage.textContent = 'יש למלא את כל השדות: תיאור, תאריך ושעה.';
+        inputErrorMessage.textContent = 'יש למלוא את כל השדות: תיאור, תאריך ושעה.';
         setTimeout(() => inputErrorMessage.textContent = '', 3000);
         return;
     }
@@ -632,6 +637,8 @@ const handleAuthState = async (user) => {
         if (searchInput) searchInput.value = ''; 
         isSearchInputVisible = false;
     }
+    // Resolve the promise once the initial auth state has been handled
+    firebaseAuthReadyResolve();
 };
 
 // --- Clock Functions ---
@@ -1198,18 +1205,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (loadingStateRow) loadingStateRow.classList.remove('hidden'); 
 
-    try {
-        if (initialAuthToken) {
-            await signInWithCustomToken(auth, initialAuthToken);
-            console.log("Signed in with custom token.");
-        } else {
-            await signInAnonymously(auth);
-            console.log("Signed in anonymously.");
+    // Attach the auth state listener *before* attempting any sign-in
+    onAuthStateChanged(auth, handleAuthState);
+
+    // Wait for the initial auth state to be determined
+    await firebaseAuthReady;
+
+    // Only attempt automatic sign-in if no user is currently signed in
+    if (!auth.currentUser) {
+        try {
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
+                console.log("Signed in with custom token.");
+            } else {
+                // If no initialAuthToken is provided, and anonymous is disabled,
+                // we should directly go to the login page.
+                // We'll skip signInAnonymously to avoid an auth/admin-restricted-operation error.
+                console.log("No custom token. Anonymous sign-in skipped as it might be disabled. Directing to login.");
+                showLoginPage(); 
+            }
+        } catch (error) {
+            console.error("Error during automatic sign-in:", error);
+            // Even with the above check, if something else fails with custom token, show error.
+            if (!error.code || !error.code.includes('auth/admin-restricted-operation')) {
+                loginErrorMessage.textContent = "שגיאת התחברות אוטומטית: " + error.message;
+            }
+            showLoginPage(); 
         }
-    } catch (error) {
-        console.error("Error during automatic sign-in:", error);
-        loginErrorMessage.textContent = "שגיאת התחברות אוטומטית: " + error.message;
-        showLoginPage(); 
+    } else {
+        console.log("User already signed in from previous session. Skipping automatic sign-in.");
     }
 
 
@@ -1281,8 +1305,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             headerMenu.classList.remove('open');
         });
     }
-
-    onAuthStateChanged(auth, handleAuthState);
 
 
     // --- Attach Main App Event Listeners ---
@@ -1605,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (selectedType && orderOfOperations[selectedType]) {
                 renderCurrentTasksForSettings(selectedType);
                 if (newTaskItemInput) newTaskItemInput.classList.remove('hidden');
-                if (addTaskItemBtn) addTaskItemBtn.classList.remove('hidden');
+                if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden'); // Ensure this is hidden until a task is added
             } else {
                 if (currentTasksForSettings) currentTasksForSettings.innerHTML = '<p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>';
                 if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
