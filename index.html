@@ -1,475 +1,255 @@
-/* style.css */
-*, *::before, *::after { /* Global box-sizing for consistent layout */
-    box-sizing: border-box;
-}
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>יומן חפ"ק - לפיד</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Assistant', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-[#FDFBF7] text-[#4A443E] flex flex-col h-screen overflow-hidden">
+    
+    <!-- Login Page -->
+    <div id="login-page" class="absolute inset-0 bg-[#FDFBF7] flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-lg ring-1 ring-[#EAE2D9] w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold text-[#6D5F53] mb-6">התחברות ליומן חפ"ק</h2>
+            <div class="mb-4">
+                <label for="loginEmail" class="sr-only">אימייל</label>
+                <input type="email" id="loginEmail" placeholder="אימייל" class="form-input w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" value="user@example.com">
+            </div>
+            <div class="mb-6">
+                <label for="loginPassword" class="sr-only">סיסמה</label>
+                <input type="password" id="loginPassword" placeholder="סיסמה" class="form-input w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" value="123456">
+            </div>
+            <button id="loginBtn" class="btn-primary w-full py-3 rounded-lg text-lg font-semibold shadow">התחבר</button>
+            <p id="loginErrorMessage" class="text-red-500 text-sm mt-4 h-5"></p>
+        </div>
+    </div>
 
-html, body {
-    height: 100%; /* Ensure html and body take full viewport height */
-    margin: 0;
-}
+    <!-- Tasks Panel (Right Side) -->
+    <div id="tasksPanel" class="tasks-panel fixed right-0 top-0 h-full bg-[#F8F5F1] shadow-xl p-4 z-40 transition-transform duration-300 ease-out transform translate-x-full overflow-y-auto w-64 md:w-80 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-[#6D5F53]">משימות עבור <span id="tasksLogTypeDisplay"></span></h3>
+            <button id="closeTasksPanelBtn" class="text-xl font-bold text-[#6D5F53] hover:text-[#4A443E]">&times;</button>
+        </div>
+        <div id="tasksList" class="space-y-3">
+            <!-- Tasks will be rendered here -->
+        </div>
+        <p id="allTasksCompletedMessage" class="text-green-600 text-center mt-6 font-semibold hidden">כל המשימות הושלמו!</p>
+    </div>
 
-body {
-    font-family: 'Assistant', sans-serif;
-    background-color: #FDFBF7;
-    display: flex; /* Make body a flex container */
-    flex-direction: column; /* Stack children vertically */
-    overflow-x: hidden; /* Prevent horizontal scroll when panel shifts content */
-}
-.table-cell {
-    padding: 12px 16px;
-    text-align: right;
-    border-bottom: 1px solid #EAE2D9;
-    vertical-align: middle;
-}
-/* Remove default border from inner table cells for cleaner look */
-.collapsible-content table .table-cell {
-    border-bottom: none;
-}
-.collapsible-content table tbody tr:last-child .table-cell {
-    border-bottom: 1px solid #EAE2D9; /* Add border to last row of inner table */
-}
+    <!-- Main Application Content -->
+    <div id="app-content" class="w-full h-full p-4 sm:p-6 md:p-8 flex-grow overflow-y-auto transition-transform duration-300 ease-out"> 
 
-/* Specific styling for table headers and cells to control width and alignment */
-.table-container th {
-    text-align: center; /* Center align table headers by default */
-}
+        <header class="text-center mb-6 flex justify-between items-center flex-wrap gap-2">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
+            <div class="flex gap-2 items-center relative">
+                
+                <!-- Task Buttons Container (Always visible on the right) -->
+                <div id="taskButtonsContainer" class="fixed right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30">
+                    <!-- Task buttons will be injected here by JavaScript -->
+                </div>
 
-/* Adjusting column widths for better fit to ensure "פעולות" column is visible */
-/* Apply table-layout: fixed to the table to ensure column widths are respected */
-.table-container table {
-    table-layout: fixed; /* Ensures column widths are honored */
-    width: 100%; /* Make sure table takes full width */
-}
+                <!-- Hamburger Menu Button -->
+                <button id="menuToggleBtn" class="btn-secondary font-bold py-1.5 px-3 rounded-lg shadow text-xl"><i class="fas fa-bars"></i></button>
+                
+                <!-- Header Menu (Dropdown) -->
+                <div id="headerMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden origin-top-right transform scale-95 opacity-0 transition-all duration-200 ease-out"
+                     role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
+                    <button id="searchLogBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">חיפוש ביומן</button>
+                    <input type="text" id="searchInput" class="form-input p-1.5 border rounded-lg text-sm w-full px-4 py-2 mt-1 hidden" placeholder="חפש...">
+                    <button id="exportExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייצא לאקסל</button>
+                    <button id="importExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייבוא מאקסל</button>
+                    <button id="editReportersBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ערוך מדווחים</button>
+                    <!-- Updated: Added "הוסף שיוך" inside the Task Settings menu -->
+                    <button id="manageTaskSettingsBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ניהול הגדרות משימות</button>
+                    <button id="logoutBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">התנתק</button>
+                </div>
+            </div>
+        </header>
 
-/* Add overflow-x to table container for mobile responsiveness */
-.table-container {
-    overflow-x: auto; /* Allows horizontal scrolling if content overflows */
-}
+        <!-- Clock Section -->
+        <section class="flex flex-col md:flex-row gap-6 mb-6">
+            
+            <div class="clock-container flex-1">
+                <div class="clock-label">שעה נוכחית</div>
+                <div id="currentTimeDisplay" class="clock-display">00:00:00</div>
+            </div>
 
-/* Updated column widths for better desktop visibility (default) */
-.table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-    width: 55%; /* Adjusted for more space */
-    text-align: right; /* Align report description to the right */
-    /* Removed overflow: hidden, text-overflow: ellipsis, white-space: nowrap to allow text to wrap */
-}
+            <!-- Assessment Clock -->
+            <div class="clock-container flex-1">
+                <div class="clock-label">הערכת מצב</div>
+                <div class="flex items-center justify-center gap-4"> 
+                    <button id="assessmentTimeMinusBtn" class="clock-button">-</button> 
+                    <div id="assessmentTimeDisplay" class="clock-display">00:00</div> 
+                    <button id="assessmentTimePlusBtn" class="clock-button">+</button> 
+                </div>
+            </div>
+        </section>
 
-.table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 10%; 
-    min-width: 4rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align time */
-}
+        <main class="bg-white rounded-xl shadow-lg p-6 ring-1 ring-[#EAE2D9]">
+            <div class="controls-section mb-6 pb-6 border-b border-[#EAE2D9]">
+                
+                <div class="max-w-full mx-auto mb-6 p-4 bg-[#F8F5F1] rounded-lg shadow-inner">
+                    <div class="flex flex-col sm:flex-row items-end gap-4"> 
+                        <div class="flex-grow-[5] w-full sm:w-auto min-w-0 form-input-group">
+                            <label for="generalTextInput" class="block mb-1 text-sm font-semibold text-[#6D5F53]">תיאור דיווח:</label>
+                            <textarea id="generalTextInput" class="form-textarea w-full p-2 border rounded-md form-textarea-aligned" rows="3" placeholder="פרטי דיווח קצרים..."></textarea>
+                        </div>
+                        
+                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterReporter" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">מדווח:</label>
+                            <select id="filterReporter" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
+                                <!-- Reporters will be dynamically populated here -->
+                            </select>
+                        </div>
+                        
+                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterLogType" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">שיוך:</label>
+                            <select id="filterLogType" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
+                                <option value="">בחר שיוך</option>
+                                <option value="שגרה">שגרה</option>
+                                <option value="בטחוני">בטחוני</option>
+                                <option value="שריפה">שריפה</option>
+                                <option value="נעדר">נעדר</option>
+                            </select>
+                        </div>
+                        
+                        <div id="dateTimeInputsWrapper" class="flex-shrink-0 w-full sm:w-48 hidden">
+                            <div class="flex flex-col gap-2">
+                                <div>
+                                    <label for="newDate" class="block mb-1 text-sm font-semibold text-[#6D5F53]">תאריך:</label>
+                                    <input type="date" id="newDate" class="form-input w-full p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label for="newTime" class="block mb-1 text-sm font-semibold text-[#6D5F53]">שעה:</label>
+                                    <input type="text" id="newTime" class="form-input w-full p-2 border rounded-md" placeholder="HH:MM" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]">
+                                </div>
+                            </div>
+                        </div>
 
-.table-container th:nth-child(3), .table-container td:nth-child(3) { /* מדווח (שם המדווח) */
-    width: 15%; /* Reduced width */
-    min-width: 6rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align reporter */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+                        <div class="flex-shrink-0 w-full sm:w-auto flex flex-row sm:flex-col items-end gap-2"> 
+                            <button id="mainActionBtn" class="btn-primary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto">הזן</button>
+                            <button id="cancelEditBtn" class="btn-secondary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto hidden">ביטול</button>
+                        </div>
+                    </div>
+                    <div id="inputErrorMessage" class="text-red-500 text-center mt-4 h-5"></div>
+                </div>
 
-.table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך (שיוך יומן) */
-    width: 10%; 
-    min-width: 4rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align log type */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+            </div>
 
-.table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-    width: 10%; 
-    min-width: 4.5rem; /* Minimum width for actions button */
-    text-align: center; /* Center align actions */
-}
+            <!-- Reports Table -->
+            <div class="table-container overflow-x-auto">
+                <div class="flex justify-start gap-4 mb-4">
+                    <button id="expandAllBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">פתח הכל</button>
+                    <button id="collapseAllBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">צמצם הכל</button>
+                </div>
+                
+                <table class="w-full min-w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th class="table-cell font-bold text-[#6D5F53]">דיווח</th>
+                            <th class="table-cell font-bold text-[#6D5F53] w-24 min-w-[6rem] text-center">שעה</th>
+                            <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only w-32 min-w-[8rem] text-center">שם המדווח</th>
+                            <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only w-24 min-w-[6rem] text-center">שיוך יומן</th>
+                            <th class="table-cell font-bold text-[#6D5F53] w-24 min-w-[6rem] text-center">פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody">
+                        <tr id="empty-state">
+                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">לא נוספו דיווחים עדיין.</td>
+                        </tr>
+                        <tr id="loading-state" class="hidden">
+                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">טוען דיווחים...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
 
-.form-input, .form-select, .form-textarea {
-    border-color: #DCD5CC;
-    transition: all 0.3s ease;
-    /* Ensure a sensible default min-height for textarea */
-    min-height: calc(1.5em * 3 + 1rem); /* Roughly 3 lines height + padding for default rows="3" */
-    overflow-y: auto; /* Changed to auto to allow pasted content with newlines to be displayed and scrolled if needed */
-    border-radius: 0.5rem; /* rounded-lg equivalent for default form inputs */
-}
-.form-input:focus, .form-select:focus, .form-textarea:focus {
-    border-color: #B8A692;
-    box-shadow: 0 0 0 2px rgba(184, 166, 146, 0.2);
-    outline: none;
-}
-.btn-primary {
-    background-color: #8C7A6B;
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
-}
-.btn-primary:hover {
-    background-color: #736357;
-}
-.btn-secondary {
-    background-color: #EAE2D9;
-    color: #6D5F53;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
-}
-.btn-secondary:hover {
-    background-color: #DCD5CC;
-}
-/* Refined edit-mode styling for textarea: ensures a minimum height and allows manual resize */
-.form-textarea.edit-mode-fixed-height {
-    min-height: calc(1.5em * 5 + 1rem); /* Ensure a minimum height for edit mode, matching rows="5" */
-    resize: vertical; /* Allow manual vertical resize */
-    /* REMOVED height: auto !important; to prevent conflict with JS dynamic sizing */
-}
+    </div>
 
-/* Clock specific styles */
-.clock-container {
-    background-color: #FFF;
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
-    padding: 0.5rem 0.75rem; /* Reduced padding */
-    border: 1px solid #EAE2D9; /* ring-1 ring-[#EAE2D9] */
-    margin-top: 1rem; /* Adjusted margin-top */
-    text-align: center;
-    display: flex; /* Use flexbox for vertical alignment */
-    flex-direction: column; /* Stack children vertically */
-    justify-content: center; /* Center content vertically */
-    align-items: center; /* Center content horizontally */
-}
-.clock-display {
-    font-size: 2.5rem; /* text-4xl */
-    font-weight: 700; /* font-bold */
-    color: #6D5F53;
-    /* margin-bottom: 0.25rem; */ /* Removed margin-bottom here as it's now in a flex row with buttons */
-}
-.clock-label {
-    font-size: 1.25rem; /* text-xl */
-    font-weight: 600; /* font-semibold */
-    color: #6D5F53;
-    margin-bottom: 0.125rem; /* Reduced margin-bottom */
-}
-.clock-button {
-    background-color: #8C7A6B;
-    color: #FFFFFF;
-    font-weight: 700; /* font-bold */
-    padding: 0.4rem 0.8rem; /* Adjusted padding */
-    border-radius: 0.5rem;
-    transition: background-color 0.3s ease;
-}
-.clock-button:hover {
-    background-color: #736357;
-}
+    <!-- Reporters Management Modal -->
+    <div id="reportersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
+            <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול מדווחים</h3>
+            
+            <div class="mb-4">
+                <label for="newReporterName" class="block mb-2 text-sm font-semibold text-[#6D5F53]">שם מדווח חדש:</label>
+                <input type="text" id="newReporterName" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" placeholder="הזן שם">
+            </div>
+            <button id="addReporterBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mb-6">הוסף מדווח</button>
 
-/* Blinking animation */
-@keyframes blinker {
-    50% { opacity: 0; }
-}
-.blinking-red {
-    color: #ef4444; /* red-500 */
-    animation: blinker 1s linear infinite;
-}
+            <div class="mb-4">
+                <h4 class="text-lg font-semibold text-[#6D5F53] mb-3">מדווחים קיימים:</h4>
+                <ul id="reportersList" class="border border-[#EAE2D9] rounded-lg bg-[#F8F5F1] max-h-48 overflow-y-auto divide-y divide-[#DCD5CC]">
+                    <!-- Reporters list will be rendered here -->
+                </ul>
+            </div>
+            
+            <button id="closeReportersModalBtn" class="btn-secondary py-2 px-4 rounded-lg font-semibold shadow">סגור</button>
+            <p id="reporterErrorMessage" class="text-red-500 text-sm mt-4 h-5"></p>
+        </div>
+    </div>
 
-/* Highlight for search results */
-.highlight {
-    background-color: yellow;
-    padding: 1px 2px;
-    border-radius: 3px;
-}
+    <!-- Task Settings Modal -->
+    <div id="taskSettingsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
+            <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול הגדרות משימות</h3>
+            <p class="text-gray-700 mb-4">
+                כאן תוכל להגדיר את רשימות המשימות עבור כל שיוך יומן.
+            </p>
+            <div class="mb-4">
+                <label for="selectTaskTypeForSettings" class="block mb-2 text-sm font-semibold text-[#6D5F53]">בחר שיוך:</label>
+                <select id="selectTaskTypeForSettings" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm mb-4">
+                    <option value="">בחר שיוך</option>
+                    <option value="הוסף שיוך">הוסף שיוך</option> <!-- New option for adding a new log type -->
+                    <option value="שגרה">שגרה</option>
+                    <option value="בטחוני">בטחוני</option>
+                    <option value="שריפה">שריפה</option>
+                    <option value="נעדר">נעדר</option>
+                </select>
+                <!-- New input for adding a new log type name -->
+                <input type="text" id="newTaskTypeInput" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692] mt-2 hidden" placeholder="הזן שם שיוך חדש">
+                <button id="addNewTaskTypeBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mt-2 hidden">הוסף שיוך חדש</button>
 
-/* Aligning form elements */
-.form-row-aligned {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem; /* Space between elements in column */
-    align-items: flex-start; /* Align labels/inputs to the start */
-}
-@media (min-width: 640px) { /* sm breakpoint */
-    .form-row-aligned {
-        flex-direction: row;
-        align-items: flex-end; /* Align to bottom for row layout */
-    }
-    .form-input-group {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end; /* Push content to bottom */
-    }
-    /* Adjust textarea height to match group of two selects */
-    .form-textarea-aligned {
-        height: 5.5rem; /* Approximate height of two selects + labels + margins */
-    }
-}
+                <div id="currentTasksForSettings" class="border border-[#EAE2D9] rounded-lg bg-[#F8F5F1] p-3 max-h-48 overflow-y-auto text-sm mt-4">
+                    <p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>
+                </div>
+                <input type="text" id="newTaskItemInput" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692] mt-4 hidden" placeholder="הוסף משימה חדשה">
+                <button id="addTaskItemBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mt-2 hidden">הוסף משימה</button>
+            </div>
+            
+            <button id="closeTaskSettingsModalBtn" class="btn-secondary py-2 px-4 rounded-lg font-semibold shadow">סגור</button>
+        </div>
+    </div>
 
-/* --- New Styles for Mobile Responsiveness and Tasks Panel --- */
+    <!-- Custom Alert Modal -->
+    <div id="customAlert" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+            <p id="customAlertMessage" class="text-lg font-semibold text-[#6D5F53] mb-4"></p>
+            <button id="customAlertCloseBtn" class="btn-primary py-2 px-4 rounded-lg">אישור</button>
+        </div>
+    </div>
 
-/* Hide columns on mobile for better readability */
-@media (max-width: 639px) { /* Targets screens smaller than 640px */
-    .table-cell-desktop-only {
-        display: none;
-    }
-    /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        colspan: 3;
-    }
-    .table-cell-mobile-only {
-        display: table-cell; /* Ensure this is visible on mobile */
-    }
-    /* Mobile specific column widths */
-    .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 45%; /* Further adjusted for more content space on mobile */
-        text-align: right; /* Ensure alignment */
-        font-size: 0.8rem; /* Smaller font for main report content */
-        padding: 8px; /* Reduced padding */
-    }
-    .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-        width: 20%; /* Kept compact for time */
-        text-align: center; /* Ensure alignment */
-        font-size: 0.8rem; /* Smaller font */
-        padding: 8px; /* Reduced padding */
-    }
-    .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 35%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
-        text-align: center; /* Ensure alignment */
-        padding: 8px; /* Reduced padding */
-    }
-    /* Ensure no wrapping in headers or actions that would stretch rows too much */
-    .table-container th {
-        white-space: nowrap; /* Prevent headers from wrapping */
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-align: right; /* Align headers to right on mobile */
-        font-size: 0.85rem; /* Smaller font for headers */
-        padding: 8px; /* Reduced padding */
-    }
-    /* Adjust font size for actions on mobile if necessary to fit */
-    .table-cell button, .table-cell span {
-        font-size: 0.7rem; /* Even smaller font for buttons/spans in action column */
-        padding: 0.2rem 0.4rem; /* Adjust padding for smaller buttons */
-        min-width: unset; /* Remove min-width that might stretch */
-    }
-    /* Adjusting daily summary text alignment on mobile to prevent overflow */
-    .daily-summary {
-        display: block; /* Make it a block element to take its own line if needed */
-        font-size: 0.65rem; /* Slightly smaller font for summary */
-        text-align: right; /* Align right */
-        white-space: normal; /* Allow text to wrap if it's very long */
-        word-break: break-word; /* Break long words */
-        margin-top: 0.25rem; /* Add a small top margin */
-    }
-    /* Ensure the toggle button does not take up too much space and aligns well */
-    .toggle-day-btn {
-        flex-shrink: 0; /* Prevent it from shrinking */
-        align-self: flex-start; /* Align to the start of the td content */
-        margin-left: 0; /* Remove extra margin on mobile */
-        margin-right: 0.5rem; /* Add some space between button and text */
-        padding: 0.2rem;
-    }
-    .date-group-header td {
-        display: flex; /* Use flexbox for the date header cell */
-        flex-wrap: wrap; /* Allow content to wrap */
-        align-items: center; /* Align items vertically */
-        justify-content: flex-start; /* Align to start (right for RTL) */
-    }
-    /* Make the date text part align correctly with the summary below it */
-    .date-group-header td > span:first-of-type { /* This targets the actual date string */
-        flex-grow: 1; /* Allow the date text to grow and take available space */
-        text-align: right;
-        margin-left: 0.5rem; /* Space before date text */
-    }
-    .date-group-header td .text-blue-600 { /* This is the toggle button */
-        order: 1; /* Place toggle button first (on the right in RTL) */
-    }
-    .date-group-header td .daily-summary {
-        order: 3; /* Place summary after date and toggle */
-        width: 100%; /* Take full width below the date */
-        text-align: right;
-    }
-}
-
-/* Ensure mobile-only cells are hidden on desktop */
-@media (min-width: 640px) {
-    .table-cell-mobile-only {
-        display: none;
-    }
-    .table-cell-desktop-only {
-        display: table-cell; /* Ensure these are visible on desktop */
-    }
-    /* Reset colspan for desktop (5 visible columns now: דיווח, שעה, מדווח, שיוך, פעולות) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        colspan: 5;
-    }
-    /* Ensure daily summary is hidden on desktop by default */
-    .daily-summary {
-        display: none;
-    }
-}
-
-
-/* Tasks Panel Styling - Modified for Right side positioning and animation */
-.tasks-panel {
-    position: fixed;
-    right: 0; /* Aligned to the right edge */
-    left: auto; /* Ensure left is not set */
-    top: 0;
-    height: 100%;
-    width: 250px; /* Default width */
-    max-width: 90%; /* Max width on smaller screens */
-    background-color: #F8F5F1;
-    border-left: 1px solid #DCD5CC; /* Changed to left border */
-    border-right: none; /* Removed right border */
-    box-shadow: -2px 0 8px rgba(0,0,0,0.1); /* Adjusted shadow for right side */
-    transform: translateX(100%); /* Start off-screen to the right */
-    transition: transform 0.3s ease-out; /* Smooth transition */
-    z-index: 45; /* Below the button but above main content */
-    padding: 1rem; /* Adjusted padding */
-}
-.tasks-panel.is-open {
-    transform: translateX(0); /* Slide in to be fully visible from the right */
-}
-
-/* Main content shifting when tasks panel is open - Adjusted for Right side panel */
-#app-content.app-content-shifted {
-    transform: translateX(-250px); /* Push app-content to the left by panel's width */
-    transition: transform 0.3s ease-out; /* Add a transition to app-content for smooth movement */
-}
-@media (min-width: 768px) { /* md breakpoint and up */
-    .tasks-panel {
-        width: 300px; /* Wider on desktop */
-    }
-    #app-content.app-content-shifted {
-        transform: translateX(-300px); /* Adjust shift for wider panel */
-    }
-}
-
-
-.task-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem;
-    background-color: #FFFFFF;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    transition: background-color 0.2s ease;
-}
-.task-item:hover {
-    background-color: #EAE2D9;
-}
-.task-item.highlight-completed {
-    background-color: #DCD5CC; /* Gray background */
-    color: #6D5F53;
-    text-decoration: line-through; /* Strikethrough */
-}
-.task-item input[type="checkbox"] {
-    margin-right: 0.75rem; /* Space between checkbox and text */
-    min-width: 1.25rem; /* Ensure checkbox is not too small */
-    min-height: 1.25rem;
-    cursor: pointer;
-}
-
-/* Reporters Modal Styling */
-#reportersModal .reporters-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
-}
-#reportersModal .reporters-list-item:hover {
-    background-color: #EAE2D9;
-}
-#reportersModal .reporters-list-item button {
-    background-color: #ef4444; /* red-500 */
-    color: white;
-    padding: 0.25rem 0.6rem;
-    border-radius: 0.375rem; /* rounded-md */
-    font-size: 0.8rem;
-    font-weight: 600;
-    transition: background-color 0.3s ease;
-}
-.reporters-list-item button:hover {
-    background-color: #dc2626; 
-}
-
-/* Custom Alert Modal */
-#customAlert > div {
-    border-radius: 0.75rem; /* rounded-xl */
-}
-
-/* Header Buttons Styling (including new Tasks button) */
-.btn-tasks {
-    background-color: #ef4444; /* red-500 */
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem;
-    font-weight: 700;
-    padding: 0.5rem 1rem; /* Adjust padding for regular buttons */
-}
-.btn-tasks:hover {
-    background-color: #dc2626; 
-}
-.btn-tasks.completed-tasks {
-    background-color: #22c55e; /* green-500 */
-}
-.btn-tasks.completed-tasks:hover {
-    background-color: #16a34a; 
-}
-
-/* Header Menu Styling */
-#headerMenu {
-    top: 100%; /* Position below the toggle button */
-    right: 0; /* Align to the right of its parent (flex item) */
-    min-width: 150px; /* Adjust as needed */
-}
-#headerMenu.open {
-    display: block;
-    /* Shifts the menu 50% of its own width to the right from its current positioned location */
-    transform: scale(1) translateX(50%); 
-    opacity: 1;
-}
-
-/* Styling for the dynamic tasks buttons container - Adjusted for Right side positioning */
-#taskButtonsContainer {
-    position: fixed;
-    right: 0; /* Aligned to the right edge */
-    left: auto; /* Ensure left is not set */
-    top: 50%; 
-    transform: translateY(-50%); 
-    z-index: 50; /* Higher z-index to always be on top */
-    display: flex;
-    flex-direction: column; 
-    gap: 0.5rem; 
-}
-
-/* Styling for individual task type buttons - Adjusted for Right side positioning */
-.task-type-button {
-    writing-mode: vertical-rl; 
-    text-orientation: mixed; 
-    padding: 0.75rem 0.5rem; 
-    border-top-left-radius: 0.5rem; /* Changed to left radius */
-    border-bottom-left-radius: 0.5rem; /* Changed to left radius */
-    border-top-right-radius: 0; /* Ensured right radius is 0 */
-    border-bottom-right-radius: 0; /* Ensured right radius is 0 */
-    font-weight: 700;
-    color: #6D5F53; /* Default text color for neutral state */
-    transition: background-color 0.3s ease;
-    border: none; 
-    cursor: pointer;
-    text-align: center;
-    background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
-}
-
-/* Task button states based on completion and reports */
-.task-type-button.tasks-incomplete-with-reports { /* Red when tasks are not completed but there are reports for today */
-    background-color: #ef4444; 
-    color: #FFFFFF; /* Ensure text is white on red */
-}
-.task-type-button.tasks-incomplete-with-reports:hover {
-    background-color: #dc2626; 
-}
-.task-type-button.all-tasks-completed { /* Green when all tasks are completed for today */
-    background-color: #22c55e; 
-    color: #FFFFFF; /* Ensure text is white on green */
-}
-.task-type-button.all-tasks-completed:hover {
-    background-color: #16a34a; 
-}
+    <script type="module" src="firebase.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
