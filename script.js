@@ -31,14 +31,19 @@ import {
 let reportsCollectionRef = null; 
 let reportersCollectionRef = null;
 let tasksCompletionCollectionRef = null; 
+let logTypesCollectionRef = null; // New: Reference for log types collection
 
 // Unsubscribe functions for real-time listeners
 let unsubscribeFromReports = null; 
 let unsubscribeFromReporters = null; 
 let unsubscribeFromTasksCompletion = null; 
+let unsubscribeFromLogTypes = null; // New: Unsubscribe for log types
 
 // Global state for tasks completion (client-side cache)
 let completedTasks = {}; 
+
+// Global state for defined task types (log types) and their tasks
+let definedLogTypes = []; // Array of log type objects: { name: "שגרה", tasks: [] }
 
 // New global promise to signal when Firebase auth state is initially determined
 let firebaseAuthReadyResolve;
@@ -78,10 +83,10 @@ let headerMenu;
 let searchLogBtn;   
 let searchInput;    
 let exportExcelBtn; 
-let importExcelBtn; // Added import button reference
+let importExcelBtn; 
 let editReportersBtn; 
-let taskButtonsContainer; // Container for multiple task buttons
-let manageTaskSettingsBtn; // New DOM reference for "ניהול הגדרות משימות" button
+let taskButtonsContainer; 
+let manageTaskSettingsBtn; 
 
 // Clock DOM references
 let currentTimeDisplay;
@@ -112,6 +117,8 @@ let reporterErrorMessage;
 let taskSettingsModal;
 let closeTaskSettingsModalBtn;
 let selectTaskTypeForSettings;
+let newTaskTypeInput; // New: Input for new task type name
+let addNewTaskTypeBtn; // New: Button for adding new task type
 let currentTasksForSettings;
 let newTaskItemInput;
 let addTaskItemBtn;
@@ -130,9 +137,8 @@ const showLoginPage = () => {
         appContent.classList.add('hidden');
         appContent.classList.remove('app-content-shifted'); 
     }
-    if (tasksPanel) tasksPanel.classList.remove('is-open');
-    if (reportersModal) reportersModal.classList.add('hidden');
-    if (taskSettingsModal) taskSettingsModal.classList.add('hidden'); // Ensure settings modal is hidden
+    if (tasksPanel) tasksPanel.classList.remove('is-open'); // Ensure tasks panel is closed
+    if (tasksPanel) tasksPanel.classList.add('hidden'); // Ensure tasks panel is hidden on login page
     if (headerMenu) headerMenu.classList.remove('open');
 };
 
@@ -405,8 +411,7 @@ const resetForm = () => {
     }
 
     if (filterLogType) {
-        filterLogType.value = ""; 
-        updateTasksButtonStates(); // Update all tasks buttons
+        // filterLogType.value = ""; // Don't reset this, as it affects task buttons
     }
     toggleTasksPanel(false); 
 };
@@ -564,6 +569,11 @@ const handleAuthState = async (user) => {
             tasksCompletionCollectionRef = doc(db, `artifacts/${appId}/users/${currentUserId}/tasks_completion`, 'status');
             console.log('Tasks completion document path (PRIVATE):', `artifacts/${appId}/users/${currentUserId}/tasks_completion/status`);
         }
+        // New: Initialize log types collection reference
+        if (!logTypesCollectionRef) {
+            logTypesCollectionRef = collection(db, `artifacts/${appId}/public/data/log_types`);
+            console.log('Log Types collection path (PUBLIC):', `artifacts/${appId}/public/data/log_types`);
+        }
        
         if (!unsubscribeFromReports) {
             unsubscribeFromReports = onSnapshot(reportsCollectionRef, (snapshot) => {
@@ -618,6 +628,37 @@ const handleAuthState = async (user) => {
                 console.error("Error getting tasks completion in real-time: ", error);
             });
         }
+
+        // New: Listen for changes in log types and their tasks
+        if (!unsubscribeFromLogTypes) {
+            unsubscribeFromLogTypes = onSnapshot(logTypesCollectionRef, async (snapshot) => {
+                const fetchedLogTypes = [];
+                snapshot.forEach(doc => {
+                    fetchedLogTypes.push({ id: doc.id, ...doc.data() });
+                });
+                definedLogTypes = fetchedLogTypes;
+                console.log('Defined Log Types fetched:', definedLogTypes);
+                
+                // Populate log type dropdowns and update task buttons
+                populateLogTypesDropdowns(definedLogTypes);
+                updateTasksButtonStates();
+                
+                // Add default log types if the collection is empty
+                if (snapshot.size === 0 && !localStorage.getItem('defaultLogTypesAddedOnce')) {
+                    await addDefaultLogTypesIfEmpty();
+                }
+
+                // If task panel is open, re-render it with potentially new tasks
+                if (tasksPanel && tasksPanel.classList.contains('is-open')) {
+                    const currentLogType = tasksLogTypeDisplay.textContent;
+                    renderTasksPanel(currentLogType);
+                }
+
+            }, (error) => {
+                console.error("Error getting log types in real-time: ", error);
+            });
+        }
+
         // Enable reporters button if user is signed in
         if (editReportersBtn) {
             editReportersBtn.disabled = false;
@@ -636,6 +677,8 @@ const handleAuthState = async (user) => {
         unsubscribeFromReporters = null;
         if (unsubscribeFromTasksCompletion) unsubscribeFromTasksCompletion();
         unsubscribeFromTasksCompletion = null;
+        if (unsubscribeFromLogTypes) unsubscribeFromLogTypes(); // New: Unsubscribe log types
+        unsubscribeFromLogTypes = null;
 
         if (searchInput) searchInput.classList.add('hidden'); 
         if (searchInput) searchInput.value = ''; 
@@ -904,44 +947,23 @@ const addDefaultReportersIfEmpty = async () => {
 
 
 // --- Order of Operations / Tasks Panel ---
-const orderOfOperations = {
-    "בטחוני": [
-        { id: 'sec_task_1', text: 'בדיקת קשר ותקשורת עם מפקדה' },
-        { id: 'sec_task_2', text: 'אבטחת שטח/ציר פיזי' },
-        { id: 'sec_task_3', text: 'פריסת כוחות/עמדות' },
-        { id: 'sec_task_4', text: 'תיאום עם גורמי ביטחון נוספים' },
-        { id: 'sec_task_5', text: 'הערכת מצב ראשונית' },
-    ],
-    "שריפה": [
-        { id: 'fire_task_1', text: 'הודעה מיידית לכבאות והצלה' },
-        { id: 'fire_task_2', text: 'פינוי מיידי של נפגעים/לכודים' },
-        { id: 'fire_task_3', text: 'הגדרת קווי אש/מגבלות התפשטות' },
-        { id: 'fire_task_4', text: 'אבטחת גישה לצוותי חירום' },
-        { id: 'fire_task_5', text: 'כיבוי ראשוני (אם בטוח)' },
-    ],
-    "נעדר": [
-        { id: 'missing_task_1', text: 'קבלת פרטים מזהים ופרטי לבוש' },
-        { id: 'missing_task_2', text: 'איסוף מידע על נסיבות ההיעלמות' },
-        { id: 'missing_task_3', text: 'פתיחת סריקה ראשונית באזור' },
-        { id: 'missing_task_4', text: 'הודעה למשטרה ולגורמי חיפוש' },
-        { id: 'missing_task_5', text: 'גיוס כוחות סיוע (מתנדבים/כלבנים)' },
-    ],
-    "שגרה": [
-        { id: 'routine_task_1', text: 'בדיקת תקינות מערכות' },
-        { id: 'routine_task_2', text: 'עדכון סטטוס משימות פתוחות' },
-        { id: 'routine_task_3', text: 'ביצוע סיור/בדיקה תקופתית' },
-        { id: 'routine_task_4', text: 'הכנת ציוד ומשאבים' },
-    ],
-};
+// This will now be populated dynamically from Firestore via `definedLogTypes`
+// const orderOfOperations = { ... }; 
 
 const toggleTasksPanel = (open) => { 
     if (tasksPanel && appContent) {
         if (open) {
-            tasksPanel.classList.add('is-open');
-            appContent.classList.add('app-content-shifted');
+            tasksPanel.classList.remove('hidden'); // Ensure it's visible before transform
+            setTimeout(() => { // Small delay to allow 'hidden' class to be removed before transform
+                tasksPanel.classList.add('is-open');
+                appContent.classList.add('app-content-shifted');
+            }, 10); // Adjust delay as needed
         } else {
             tasksPanel.classList.remove('is-open');
             appContent.classList.remove('app-content-shifted');
+            setTimeout(() => { // Add 'hidden' class after animation completes
+                tasksPanel.classList.add('hidden');
+            }, 300); // Should match CSS transition duration
         }
     }
 };
@@ -950,78 +972,79 @@ const toggleTasksPanel = (open) => {
 const updateTasksButtonStates = () => {
     if (!taskButtonsContainer) return; 
 
-    taskButtonsContainer.innerHTML = ''; // Clear existing buttons
+    // Clear existing buttons to prevent duplicates on re-render
+    taskButtonsContainer.innerHTML = ''; 
 
-    const allLogTypes = Object.keys(orderOfOperations); 
-
-    // Filter to only show buttons for log types that currently have reports for today
+    // Get today's date in YYYY-MM-DD format
     const today = new Date();
     const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
     
+    // Filter reports relevant to today
     const relevantReportsToday = reports.filter(report => report.date === todayKey);
-    const activeLogTypesToday = new Set(relevantReportsToday.map(r => r.logType));
+    // Get all log types that have reports for today
+    const logTypesWithReportsToday = new Set(relevantReportsToday.map(r => r.logType));
 
-    // Also include the currently selected log type, even if no reports yet for it today
-    const logTypesToShow = [];
-    allLogTypes.forEach(type => {
-        // Show button if it has active reports today, OR if it's the currently selected log type in the main form, 
-        // AND it's not already added to the list
-        if ((activeLogTypesToday.has(type) || (filterLogType && filterLogType.value === type)) && !logTypesToShow.includes(type)) {
-            logTypesToShow.push(type);
-        }
-    });
-    
+    // Sort definedLogTypes based on a custom order for display
     const customOrder = ["בטחוני", "שריפה", "נעדר", "שגרה"]; 
-    logTypesToShow.sort((a, b) => {
-        return customOrder.indexOf(a) - customOrder.indexOf(b);
+    const sortedDefinedLogTypes = [...definedLogTypes].sort((a, b) => {
+        const nameA = a.name;
+        const nameB = b.name;
+        const indexA = customOrder.indexOf(nameA);
+        const indexB = customOrder.indexOf(nameB);
+
+        // Handle cases where log types are not in customOrder (place them at the end, alphabetically)
+        if (indexA === -1 && indexB === -1) {
+            return nameA.localeCompare(nameB, 'he');
+        }
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
     });
 
-    logTypesToShow.forEach(logType => {
+    sortedDefinedLogTypes.forEach(logTypeObj => {
+        const logType = logTypeObj.name;
+        const tasksForType = logTypeObj.tasks || []; // Get tasks from the fetched log type object
+
         const button = document.createElement('button');
         button.classList.add('task-type-button'); 
         button.dataset.logType = logType;
+        button.textContent = logType;
 
-        let buttonText = `${logType}`; // Changed text to just the log type name
-        button.textContent = buttonText;
-
-        const tasksForType = orderOfOperations[logType] || [];
-        let allCompleted = true;
+        let allCompletedForToday = true;
+        let hasIncompleteTasks = false; // Flag to check if any task for this type is incomplete
         
-        // Check if there are any *incomplete* tasks for this type that have related reports today
-        let hasIncompleteTasksAndRelatedReportsToday = false;
+        // Check if there are any *incomplete* tasks for this type
         if (tasksForType.length > 0) {
             for (const task of tasksForType) {
                 const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
                 if (!isCompleted) {
-                    allCompleted = false;
-                    
-                    // Check if there's any report today related to this logType
-                    const hasReportToday = relevantReportsToday.some(report => report.logType === logType);
-                    if (hasReportToday) {
-                        hasIncompleteTasksAndRelatedReportsToday = true;
-                    }
+                    allCompletedForToday = false;
+                    hasIncompleteTasks = true;
                 }
             }
         } else {
-            allCompleted = true; // If no tasks defined, consider them "completed"
+            // If no tasks are defined for this log type, consider them "completed"
+            allCompletedForToday = true;
         }
 
         // Determine button color based on the new logic
-        if (allCompleted && tasksForType.length > 0) { // All tasks completed for this type, AND there are tasks
-            button.classList.add('completed-tasks'); // Green
-            button.classList.remove('btn-tasks'); // Ensure no red
-        } else if (hasIncompleteTasksAndRelatedReportsToday) { // Has incomplete tasks AND related reports today
-            button.classList.add('btn-tasks'); // Red
-            button.classList.remove('completed-tasks'); // Ensure no green
+        if (allCompletedForToday && tasksForType.length > 0) { // All tasks completed for this type, AND there are tasks
+            button.classList.add('all-tasks-completed'); // Green
+            button.classList.remove('tasks-incomplete-with-reports'); // Ensure no red
+        } else if (hasIncompleteTasks && logTypesWithReportsToday.has(logType)) { 
+            // Has incomplete tasks AND there is at least one report for this logType for today
+            button.classList.add('tasks-incomplete-with-reports'); // Red
+            button.classList.remove('all-tasks-completed'); // Ensure no green
         } else {
             // Default gray/neutral color (already set in CSS)
-            button.classList.remove('btn-tasks');
-            button.classList.remove('completed-tasks');
+            button.classList.remove('tasks-incomplete-with-reports');
+            button.classList.remove('all-tasks-completed');
         }
 
         button.addEventListener('click', () => {
+            // The panel opens from the right
             const isPanelOpenForThisType = tasksPanel.classList.contains('is-open') && 
-                                           tasksLogTypeDisplay.textContent === logType; // Use logType directly here
+                                           tasksLogTypeDisplay.textContent === logType;
             
             if (isPanelOpenForThisType) {
                 toggleTasksPanel(false); 
@@ -1044,7 +1067,10 @@ const renderTasksPanel = (logType) => {
 
     tasksLogTypeDisplay.textContent = logType;
     tasksList.innerHTML = '';
-    const tasksForType = orderOfOperations[logType] || [];
+    
+    // Find the tasks for the selected log type from definedLogTypes
+    const logTypeObj = definedLogTypes.find(lt => lt.name === logType);
+    const tasksForType = logTypeObj ? logTypeObj.tasks : [];
     
     let allTasksCompletedForTypeCurrentlyDisplayed = true;
 
@@ -1101,10 +1127,14 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
     }
 
     // Find if a report for this specific task and status change already exists
+    // We need to check only for today's reports for this specific task to avoid conflicts
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+
     const existingTaskReport = reports.find(r => 
         r.isTaskReport && 
         r.taskReportId === reportIdPrefix &&
-        r.description === taskReportDescription // Ensure exact match for the status (completed/cancelled)
+        r.date === todayKey // Only consider reports from today
     );
 
     if (isChecked) {
@@ -1127,21 +1157,22 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
                 console.error("Error adding auto-generated task report: ", e);
             }
         } else {
-            console.log("Task report already exists for completion, no new report added.");
+            console.log("Task report already exists for completion for today, no new report added.");
             // Optionally update timestamp if you want "last completion time"
-            // try {
-            //     await setDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id), 
-            //                  { timestamp: new Date().toISOString() }, { merge: true });
-            //     console.log("Existing task report timestamp updated.");
-            // } catch (e) {
-            //     console.error("Error updating existing task report timestamp: ", e);
-            // }
+            try {
+                await setDoc(doc(db, `artifacts/${appId}/public/data/reports`, existingTaskReport.id), 
+                             { timestamp: new Date().toISOString() }, { merge: true });
+                console.log("Existing task report timestamp updated.");
+            } catch (e) {
+                console.error("Error updating existing task report timestamp: ", e);
+            }
         }
     } else { // Task was unchecked
-        // Find any existing report for this task, regardless of its 'completed' status text
+        // Find any existing report for this task from today
         const existingTaskReportForDeletion = reports.find(r => 
             r.isTaskReport && 
-            r.taskReportId === reportIdPrefix
+            r.taskReportId === reportIdPrefix &&
+            r.date === todayKey // Only consider reports from today
         );
         if (existingTaskReportForDeletion) {
             try {
@@ -1154,6 +1185,168 @@ const handleTaskCheckboxChange = async (taskId, logType, taskText, isChecked) =>
     }
     
     renderTasksPanel(logType);
+};
+
+
+// --- Log Type Management Functions (New) ---
+const populateLogTypesDropdowns = (logTypesArray) => {
+    // Populate main filterLogType dropdown
+    if (filterLogType) {
+        // Store current value to re-select after repopulating
+        const currentSelectedValue = filterLogType.value; 
+        filterLogType.innerHTML = '<option value="">בחר שיוך</option>'; // Clear existing options
+        logTypesArray.sort((a, b) => a.name.localeCompare(b.name, 'he')).forEach(logType => {
+            const option = document.createElement('option');
+            option.value = logType.name;
+            option.textContent = logType.name;
+            filterLogType.appendChild(option);
+        });
+        filterLogType.value = currentSelectedValue; // Restore selection
+    }
+
+    // Populate taskSettingsModal's selectTaskTypeForSettings dropdown
+    if (selectTaskTypeForSettings) {
+        const currentSelectedValue = selectTaskTypeForSettings.value;
+        selectTaskTypeForSettings.innerHTML = `
+            <option value="">בחר שיוך</option>
+            <option value="הוסף שיוך">הוסף שיוך</option>
+        `; // Keep "Add Association" option
+        logTypesArray.sort((a, b) => a.name.localeCompare(b.name, 'he')).forEach(logType => {
+            const option = document.createElement('option');
+            option.value = logType.name;
+            option.textContent = logType.name;
+            selectTaskTypeForSettings.appendChild(option);
+        });
+        selectTaskTypeForSettings.value = currentSelectedValue;
+    }
+};
+
+const addDefaultLogTypesIfEmpty = async () => {
+    try {
+        const snapshot = await getDocs(logTypesCollectionRef);
+        if (snapshot.empty) {
+            console.log("Log Types collection is empty. Adding default log types.");
+            const defaultLogTypesData = [
+                { name: "שגרה", tasks: [
+                    { id: 'routine_task_1', text: 'בדיקת תקינות מערכות' },
+                    { id: 'routine_task_2', text: 'עדכון סטטוס משימות פתוחות' },
+                    { id: 'routine_task_3', text: 'ביצוע סיור/בדיקה תקופתית' },
+                    { id: 'routine_task_4', text: 'הכנת ציוד ומשאבים' },
+                ]},
+                { name: "בטחוני", tasks: [
+                    { id: 'sec_task_1', text: 'בדיקת קשר ותקשורת עם מפקדה' },
+                    { id: 'sec_task_2', text: 'אבטחת שטח/ציר פיזי' },
+                    { id: 'sec_task_3', text: 'פריסת כוחות/עמדות' },
+                    { id: 'sec_task_4', text: 'תיאום עם גורמי ביטחון נוספים' },
+                    { id: 'sec_task_5', text: 'הערכת מצב ראשונית' },
+                ]},
+                { name: "שריפה", tasks: [
+                    { id: 'fire_task_1', text: 'הודעה מיידית לכבאות והצלה' },
+                    { id: 'fire_task_2', text: 'פינוי מיידי של נפגעים/לכודים' },
+                    { id: 'fire_task_3', text: 'הגדרת קווי אש/מגבלות התפשטות' },
+                    { id: 'fire_task_4', text: 'אבטחת גישה לצוותי חירום' },
+                    { id: 'fire_task_5', text: 'כיבוי ראשוני (אם בטוח)' },
+                ]},
+                { name: "נעדר", tasks: [
+                    { id: 'missing_task_1', text: 'קבלת פרטים מזהים ופרטי לבוש' },
+                    { id: 'missing_task_2', text: 'איסוף מידע על נסיבות ההיעלמות' },
+                    { id: 'missing_task_3', text: 'פתיחת סריקה ראשונית באזור' },
+                    { id: 'missing_task_4', text: 'הודעה למשטרה ולגורמי חיפוש' },
+                    { id: 'missing_task_5', text: 'גיוס כוחות סיוע (מתנדבים/כלבנים)' },
+                ]},
+            ];
+            const batch = writeBatch(db); 
+            for (const logTypeData of defaultLogTypesData) {
+                const newDocRef = doc(logTypesCollectionRef); 
+                batch.set(newDocRef, logTypeData);
+            }
+            await batch.commit();
+            console.log("Default log types added successfully.");
+            localStorage.setItem('defaultLogTypesAddedOnce', 'true'); 
+        } else {
+            console.log("Log Types collection is not empty, skipping default log type addition.");
+        }
+    } catch (e) {
+        console.error("Error checking or adding default log types:", e);
+    }
+};
+
+const addLogType = async (logTypeName) => {
+    if (!logTypesCollectionRef || !auth.currentUser) {
+        showCustomAlert('שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה. אנא התחבר ונסה שוב.');
+        return;
+    }
+    if (!logTypeName || logTypeName.trim() === '') {
+        showCustomAlert('שם השיוך אינו יכול להיות ריק.');
+        return;
+    }
+    if (definedLogTypes.some(lt => lt.name === logTypeName.trim())) {
+        showCustomAlert('שיוך בשם זה כבר קיים.');
+        return;
+    }
+
+    try {
+        await addDoc(logTypesCollectionRef, { name: logTypeName.trim(), tasks: [] });
+        showCustomAlert(`שיוך "${logTypeName}" נוסף בהצלחה!`);
+        if (newTaskTypeInput) newTaskTypeInput.value = '';
+    } catch (e) {
+        console.error("Error adding log type: ", e);
+        showCustomAlert(`שגיאה בהוספת שיוך: ${e.message}`);
+    }
+};
+
+const addTaskToLogType = async (logTypeName, taskText) => {
+    if (!logTypesCollectionRef || !auth.currentUser) {
+        showCustomAlert('שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה. אנא התחבר ונסה שוב.');
+        return;
+    }
+    if (!taskText || taskText.trim() === '') {
+        showCustomAlert('תיאור המשימה אינו יכול להיות ריק.');
+        return;
+    }
+
+    const logTypeObj = definedLogTypes.find(lt => lt.name === logTypeName);
+    if (!logTypeObj) {
+        showCustomAlert('שיוך לא נמצא. אנא בחר שיוך קיים.');
+        return;
+    }
+
+    const newTaskId = `task_${Date.now()}`; // Simple unique ID
+    const updatedTasks = [...logTypeObj.tasks, { id: newTaskId, text: taskText.trim() }];
+
+    try {
+        const docRef = doc(db, `artifacts/${appId}/public/data/log_types`, logTypeObj.id);
+        await updateDoc(docRef, { tasks: updatedTasks });
+        showCustomAlert(`משימה נוספה לשיוך "${logTypeName}" בהצלחה!`);
+        if (newTaskItemInput) newTaskItemInput.value = '';
+    } catch (e) {
+        console.error("Error adding task to log type: ", e);
+        showCustomAlert(`שגיאה בהוספת משימה: ${e.message}`);
+    }
+};
+
+const removeTaskFromLogType = async (logTypeName, taskId) => {
+    if (!logTypesCollectionRef || !auth.currentUser) {
+        showCustomAlert('שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה. אנא התחבר ונסה שוב.');
+        return;
+    }
+
+    const logTypeObj = definedLogTypes.find(lt => lt.name === logTypeName);
+    if (!logTypeObj) {
+        showCustomAlert('שיוך לא נמצא.');
+        return;
+    }
+
+    const updatedTasks = logTypeObj.tasks.filter(task => task.id !== taskId);
+
+    try {
+        const docRef = doc(db, `artifacts/${appId}/public/data/log_types`, logTypeObj.id);
+        await updateDoc(docRef, { tasks: updatedTasks });
+        showCustomAlert(`משימה הוסרה משיוך "${logTypeName}" בהצלחה.`);
+    } catch (e) {
+        console.error("Error removing task from log type: ", e);
+        showCustomAlert(`שגיאה בהסרת משימה: ${e.message}`);
+    }
 };
 
 
@@ -1190,10 +1383,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     searchLogBtn = document.getElementById('searchLogBtn');     
     searchInput = document.getElementById('searchInput');       
     exportExcelBtn = document.getElementById('exportExcelBtn'); 
-    importExcelBtn = document.getElementById('importExcelBtn'); // Get reference for import button
+    importExcelBtn = document.getElementById('importExcelBtn'); 
     editReportersBtn = document.getElementById('editReportersBtn'); 
     taskButtonsContainer = document.getElementById('taskButtonsContainer'); 
-    manageTaskSettingsBtn = document.getElementById('manageTaskSettingsBtn'); // New DOM reference
+    manageTaskSettingsBtn = document.getElementById('manageTaskSettingsBtn'); 
 
     // Clock DOM references
     currentTimeDisplay = document.getElementById('currentTimeDisplay');
@@ -1212,7 +1405,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reportersModal = document.getElementById('reportersModal');
     closeReportersModalBtn = document.getElementById('closeReportersModalBtn');
     newReporterNameInput = document.getElementById('newReporterName');
-    addReporterBtn = document.getElementById('addReporterBtn'); // Get reference for the addReporterBtn
+    addReporterBtn = document.getElementById('addReporterBtn'); 
     reportersListUl = document.getElementById('reportersList');
     reporterErrorMessage = document.getElementById('reporterErrorMessage');
 
@@ -1220,6 +1413,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     taskSettingsModal = document.getElementById('taskSettingsModal');
     closeTaskSettingsModalBtn = document.getElementById('closeTaskSettingsModalBtn');
     selectTaskTypeForSettings = document.getElementById('selectTaskTypeForSettings');
+    newTaskTypeInput = document.getElementById('newTaskTypeInput'); // New
+    addNewTaskTypeBtn = document.getElementById('addNewTaskTypeBtn'); // New
     currentTasksForSettings = document.getElementById('currentTasksForSettings');
     newTaskItemInput = document.getElementById('newTaskItemInput');
     addTaskItemBtn = document.getElementById('addTaskItemBtn');
@@ -1228,13 +1423,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Custom Alert DOM references
     customAlert = document.getElementById('customAlert');
     customAlertMessage = document.getElementById('customAlertMessage');
-    customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
+    customAlertCloseBtn = document.getElementById('customAlertCloseBtn'); 
+
 
     // Attach event listener for addReporterBtn
-    // This line ensures that when the addReporterBtn is clicked,
-    // the addReporterToFirestore function is called with the value
-    // from the newReporterNameInput.
-    if (addReporterBtn) { // Make sure the button exists before attaching listener
+    if (addReporterBtn) { 
         addReporterBtn.addEventListener('click', () => {
             addReporterToFirestore(newReporterNameInput.value);
         });
@@ -1243,10 +1436,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Attach event listener for closeReportersModalBtn
-    if (closeReportersModalBtn) {
-        closeReportersModalBtn.addEventListener('click', closeReportersModal);
+    if (closeTasksPanelBtn) {
+        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false)); // Close on X click
     } else {
-        console.error('closeReportersModalBtn element not found! Cannot attach event listener.');
+        console.error('closeTasksPanelBtn element not found! Cannot attach event listener.');
     }
 
 
@@ -1273,15 +1466,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await signInWithCustomToken(auth, initialAuthToken);
                 console.log("Signed in with custom token.");
             } else {
-                // If no initialAuthToken is provided, and anonymous is disabled,
-                // we should directly go to the login page.
-                // We'll skip signInAnonymously to avoid an auth/admin-restricted-operation error.
                 console.log("No custom token. Anonymous sign-in skipped as it might be disabled. Directing to login.");
                 showLoginPage(); 
             }
         } catch (error) {
             console.error("Error during automatic sign-in:", error);
-            // Even with the above check, if something else fails with custom token, show error.
             if (!error.code || !error.code.includes('auth/admin-restricted-operation')) {
                 loginErrorMessage.textContent = "שגיאת התחברות אוטומטית: " + error.message;
             }
@@ -1456,14 +1645,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
                 deleteButton.addEventListener('click', async () => {
-                    // Replace confirm with a custom modal for better UX
-                    const confirmAction = window.confirm('האם אתה בטוח שברצונך למחוק דיווח זה?'); // Placeholder for custom confirm
-                    if (confirmAction) {
-                        await deleteReport(reportToEdit.id);
-                        resetForm();
-                        // Hide delete button after deletion/cancellation
-                        if (deleteButton.parentNode) deleteButton.parentNode.removeChild(deleteButton);
-                    }
+                    showCustomAlert('האם אתה בטוח שברצונך למחוק דיווח זה?'); // Using custom alert
+                    // Temporarily store action and ID for confirmation
+                    customAlert.dataset.confirmAction = 'deleteReport';
+                    customAlert.dataset.reportIdToDelete = reportToEdit.id;
                 });
 
 
@@ -1567,11 +1752,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (importExcelBtn) { // New: Import Excel button listener
+    if (importExcelBtn) { 
         importExcelBtn.addEventListener('click', () => {
-            headerMenu.classList.add('hidden'); // Close main menu
+            headerMenu.classList.add('hidden'); 
             headerMenu.classList.remove('open');
-            // Create a file input dynamically and click it
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.accept = '.xlsx, .xls';
@@ -1593,32 +1777,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                console.log("User signed out.");
-                showLoginPage(); 
-                reports = []; 
-                renderTable(); 
-                resetForm(); 
-                if (searchInput) searchInput.classList.add('hidden'); 
-                if (searchInput) searchInput.value = ''; 
-                isSearchInputVisible = false;
-            } catch (error) {
-                console.error("Error signing out:", error);
-                loginErrorMessage.textContent = "שגיאה בהתנתקות: " + error.message; 
-            }
-            headerMenu.classList.add('hidden'); 
-            headerMenu.classList.remove('open');
-        });
-    }
-
     // New: Manage Task Settings button listener
     if (manageTaskSettingsBtn) {
         manageTaskSettingsBtn.addEventListener('click', () => {
             openTaskSettingsModal();
-            headerMenu.classList.add('hidden'); // Close main menu
+            headerMenu.classList.add('hidden'); 
             headerMenu.classList.remove('open');
         });
     }
@@ -1633,19 +1796,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false));
     }
     
+    // Add mouseleave listener to tasksPanel
+    if (tasksPanel) {
+        tasksPanel.addEventListener('mouseleave', () => toggleTasksPanel(false));
+    }
+
+
     // When logType changes, update the button states
     if (filterLogType) {
         filterLogType.addEventListener('change', (e) => {
             const selectedLogType = e.target.value;
             updateTasksButtonStates(); 
             if (tasksPanel.classList.contains('is-open')) {
-                if (tasksLogTypeDisplay.textContent !== selectedLogType) { // Compare with actual display text
+                if (tasksLogTypeDisplay.textContent !== selectedLogType) { 
                     toggleTasksPanel(false); 
                 }
-            } else {
             }
-
-            if (!orderOfOperations[selectedLogType] || orderOfOperations[selectedType].length === 0) {
+            // Logic to keep task panel closed if there are no tasks for the selected type
+            const selectedLogTypeObj = definedLogTypes.find(lt => lt.name === selectedLogType);
+            if (!selectedLogTypeObj || selectedLogTypeObj.tasks.length === 0) {
                 if (tasksPanel.classList.contains('is-open') && tasksLogTypeDisplay.textContent === selectedLogType) {
                     toggleTasksPanel(false);
                 }
@@ -1663,6 +1832,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (newTaskItemInput) newTaskItemInput.value = '';
             if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
             if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden');
+            // New fields for adding log type
+            if (newTaskTypeInput) newTaskTypeInput.classList.add('hidden');
+            if (addNewTaskTypeBtn) addNewTaskTypeBtn.classList.add('hidden');
         }
     };
 
@@ -1679,22 +1851,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (selectTaskTypeForSettings) {
         selectTaskTypeForSettings.addEventListener('change', (e) => {
             const selectedType = e.target.value;
-            if (selectedType && orderOfOperations[selectedType]) {
+            if (selectedType === "הוסף שיוך") {
+                if (newTaskTypeInput) newTaskTypeInput.classList.remove('hidden');
+                if (addNewTaskTypeBtn) addNewTaskTypeBtn.classList.remove('hidden');
+                if (currentTasksForSettings) currentTasksForSettings.innerHTML = '';
+                if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
+                if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden');
+            } else if (selectedType) {
                 renderCurrentTasksForSettings(selectedType);
+                if (newTaskTypeInput) newTaskTypeInput.classList.add('hidden');
+                if (addNewTaskTypeBtn) addNewTaskTypeBtn.classList.add('hidden');
                 if (newTaskItemInput) newTaskItemInput.classList.remove('hidden');
-                if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden'); // Ensure this is hidden until a task is added
-            } else {
+                if (addTaskItemBtn) addTaskItemBtn.classList.remove('hidden');
+            } else { // "בחר שיוך" selected
                 if (currentTasksForSettings) currentTasksForSettings.innerHTML = '<p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>';
+                if (newTaskTypeInput) newTaskTypeInput.classList.add('hidden');
+                if (addNewTaskTypeBtn) addNewTaskTypeBtn.classList.add('hidden');
                 if (newTaskItemInput) newTaskItemInput.classList.add('hidden');
                 if (addTaskItemBtn) addTaskItemBtn.classList.add('hidden');
             }
         });
     }
 
+    if (addNewTaskTypeBtn) {
+        addNewTaskTypeBtn.addEventListener('click', () => {
+            const newLogTypeName = newTaskTypeInput.value.trim();
+            addLogType(newLogTypeName);
+        });
+    }
+
+
     const renderCurrentTasksForSettings = (logType) => {
         if (!currentTasksForSettings) return;
         currentTasksForSettings.innerHTML = '';
-        const tasks = orderOfOperations[logType] || [];
+        const logTypeObj = definedLogTypes.find(lt => lt.name === logType);
+        const tasks = logTypeObj ? logTypeObj.tasks : [];
+
         if (tasks.length === 0) {
             currentTasksForSettings.innerHTML = `<p class="text-gray-500 text-center">אין משימות מוגדרות עבור ${logType}.</p>`;
         } else {
@@ -1715,38 +1907,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.addEventListener('click', (e) => {
                     const taskIdToRemove = e.target.dataset.taskId;
                     const logTypeToRemove = e.target.dataset.logType;
-                    removeTaskFromOrderOfOperations(logTypeToRemove, taskIdToRemove);
-                    renderCurrentTasksForSettings(logTypeToRemove); // Re-render the list
-                    updateTasksButtonStates(); // Update main task buttons
+                    removeTaskFromLogType(logTypeToRemove, taskIdToRemove);
+                    // Re-render the list after deletion to reflect changes
+                    // Wait for Firestore listener to update definedLogTypes, then re-render
                 });
             });
         }
     };
 
-    const removeTaskFromOrderOfOperations = (logType, taskId) => {
-        if (orderOfOperations[logType]) {
-            orderOfOperations[logType] = orderOfOperations[logType].filter(task => task.id !== taskId);
-            console.log(`Task ${taskId} removed from ${logType}. Current tasks:`, orderOfOperations[logType]);
-        }
-    };
-
-    // For now, addTaskItemBtn and newTaskItemInput are for display purposes as static.
-    // To make them functional, you'd need a backend to persist these task definitions.
     if (addTaskItemBtn) {
         addTaskItemBtn.addEventListener('click', () => {
             const selectedType = selectTaskTypeForSettings.value;
             const newItemText = newTaskItemInput.value.trim();
             if (selectedType && newItemText) {
-                // This would normally involve adding to a database, not just static object
-                const newId = `manual_task_${Date.now()}`; // Simple ID generation
-                if (!orderOfOperations[selectedType]) {
-                    orderOfOperations[selectedType] = [];
-                }
-                orderOfOperations[selectedType].push({ id: newId, text: newItemText });
-                newTaskItemInput.value = '';
-                renderCurrentTasksForSettings(selectedType); // Re-render the list
-                updateTasksButtonStates(); // Update main task buttons
-                showCustomAlert("המשימה נוספה (באופן מקומי). כדי לשמור לצמיתות נדרש בסיס נתונים.");
+                addTaskToLogType(selectedType, newItemText);
             } else {
                 showCustomAlert("יש לבחור שיוך ולהזין טקסט למשימה.");
             }
@@ -1756,7 +1930,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Custom Alert Event Listener ---
     if (customAlertCloseBtn) {
         customAlertCloseBtn.addEventListener('click', () => {
-            if (customAlert) customAlert.classList.add('hidden');
+            if (customAlert) {
+                customAlert.classList.add('hidden');
+                // Handle confirmation actions here
+                if (customAlert.dataset.confirmAction === 'deleteReport') {
+                    const reportIdToDelete = customAlert.dataset.reportIdToDelete;
+                    if (reportIdToDelete) {
+                        deleteReport(reportIdToDelete);
+                    }
+                    delete customAlert.dataset.confirmAction;
+                    delete customAlert.dataset.reportIdToDelete;
+                }
+            }
         });
     }
 
@@ -1815,7 +2000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 }
                 
-                // Convert Excel date (number) toXMLHttpRequest-MM-DD string
+                // Convert Excel date (number) to YYYY-MM-DD string
                 // Excel dates are days since 1900-01-01 (or 1904-01-01 for Mac, usually 1900)
                 if (typeof reportData.date === 'number') {
                     const excelEpoch = new Date('1899-12-30T00:00:00Z'); // Excel's day 1 is 1900-01-01
@@ -1823,10 +2008,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const dateObj = new Date(excelEpoch.getTime() + reportData.date * msPerDay);
                     reportData.date = dateObj.toISOString().split('T')[0];
                 } else if (typeof reportData.date === 'string') {
-                    // Try to parse string dates intoXMLHttpRequest-MM-DD
+                    // Try to parse string dates into YYYY-MM-DD
                     const parsedDate = new Date(reportData.date);
                     if (isNaN(parsedDate.getTime())) {
-                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש:XMLHttpRequest-MM-DD או תאריך אקסל נומרי.`);
+                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: YYYY-MM-DD או תאריך אקסל נומרי.`);
                          isValid = false;
                          break;
                     }
@@ -1882,4 +2067,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.addEventListener('resize', () => {
     renderTable(searchInput ? searchInput.value.trim() : '');
 });
-
