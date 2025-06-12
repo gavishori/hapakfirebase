@@ -25,6 +25,41 @@ body {
     border-bottom: 1px solid #EAE2D9; /* Add border to last row of inner table */
 }
 
+/* Specific styling for table headers and cells to control width and alignment */
+.table-container th {
+    text-align: center; /* Center align table headers */
+}
+
+/* Adjusting column widths for better fit (set to 50% of initial values) */
+.table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
+    width: auto; /* Let content determine width */
+    text-align: right; /* Align report description to the right */
+}
+
+.table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
+    width: 3.75%; /* 50% of 7.5% */
+    min-width: 2.25rem; /* 50% of 4.5rem */
+    text-align: center; /* Center align time */
+}
+
+.table-container th:nth-child(3), .table-container td:nth-child(3) { /* שם המדווח */
+    width: 5.625%; /* 50% of 11.25% */
+    min-width: 3rem; /* 50% of 6rem */
+    text-align: center; /* Center align reporter */
+}
+
+.table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך יומן */
+    width: 3.75%; /* 50% of 7.5% */
+    min-width: 2.25rem; /* 50% of 4.5rem */
+    text-align: center; /* Center align log type */
+}
+
+.table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
+    width: 3.75%; /* 50% of 7.5% */
+    min-width: 2.25rem; /* 50% of 4.5rem */
+    text-align: center; /* Center align actions */
+}
+
 .form-input, .form-select, .form-textarea {
     border-color: #DCD5CC;
     transition: all 0.3s ease;
@@ -173,38 +208,39 @@ body {
 }
 
 
-/* Tasks Panel Styling */
+/* Tasks Panel Styling - Modified for Right side positioning and animation */
 .tasks-panel {
     position: fixed;
-    left: 0; /* Aligned to the left edge */
+    right: 0; /* Aligned to the right edge */
+    left: auto; /* Ensure left is not set */
     top: 0;
     height: 100%;
     width: 250px; /* Default width */
     max-width: 90%; /* Max width on smaller screens */
     background-color: #F8F5F1;
-    border-right: 1px solid #DCD5CC;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-    transform: translateX(-100%); /* Start off-screen to the left */
+    border-left: 1px solid #DCD5CC; /* Changed to left border */
+    border-right: none; /* Removed right border */
+    box-shadow: -2px 0 8px rgba(0,0,0,0.1); /* Adjusted shadow for right side */
+    transform: translateX(100%); /* Start off-screen to the right */
     transition: transform 0.3s ease-out; /* Smooth transition */
     z-index: 45; /* Below the button but above main content */
     padding: 1rem; /* Adjusted padding */
 }
 .tasks-panel.is-open {
-    transform: translateX(0); /* Slide in to be fully visible */
+    transform: translateX(0); /* Slide in to be fully visible from the right */
 }
 
-/* Main content shifting when tasks panel is open */
+/* Main content shifting when tasks panel is open - Adjusted for Right side panel */
 #app-content.app-content-shifted {
-    transform: translateX(250px); /* Push app-content to the right by panel's width */
-    /* Add a transition to app-content for smooth movement */
-    transition: transform 0.3s ease-out;
+    transform: translateX(-250px); /* Push app-content to the left by panel's width */
+    transition: transform 0.3s ease-out; /* Add a transition to app-content for smooth movement */
 }
 @media (min-width: 768px) { /* md breakpoint and up */
     .tasks-panel {
         width: 300px; /* Wider on desktop */
     }
     #app-content.app-content-shifted {
-        transform: translateX(300px); /* Adjust shift for wider panel */
+        transform: translateX(-300px); /* Adjust shift for wider panel */
     }
 }
 
@@ -254,7 +290,7 @@ body {
     transition: background-color 0.3s ease;
 }
 #reportersModal .reporters-list-item button:hover {
-    background-color: #dc2626; /* red-600 */
+    background-color: #dc2626; 
 }
 
 /* Custom Alert Modal */
@@ -272,13 +308,13 @@ body {
     padding: 0.5rem 1rem; /* Adjust padding for regular buttons */
 }
 .btn-tasks:hover {
-    background-color: #dc2626; /* red-600 */
+    background-color: #dc2626; 
 }
 .btn-tasks.completed-tasks {
     background-color: #22c55e; /* green-500 */
 }
 .btn-tasks.completed-tasks:hover {
-    background-color: #16a34a; /* green-600 */
+    background-color: #16a34a; 
 }
 
 /* Header Menu Styling */
@@ -293,10 +329,11 @@ body {
     opacity: 1;
 }
 
-/* Styling for the dynamic tasks buttons container */
+/* Styling for the dynamic tasks buttons container - Adjusted for Right side positioning */
 #taskButtonsContainer {
     position: fixed; /* Changed from absolute to fixed */
-    left: 0; 
+    right: 0; /* Aligned to the right edge */
+    left: auto; /* Ensure left is not set */
     top: 50%; 
     transform: translateY(-50%); 
     z-index: 50; /* Higher z-index to always be on top */
@@ -305,15 +342,15 @@ body {
     gap: 0.5rem; 
 }
 
-/* Styling for individual task type buttons */
+/* Styling for individual task type buttons - Adjusted for Right side positioning */
 .task-type-button {
     writing-mode: vertical-rl; 
     text-orientation: mixed; 
     padding: 0.75rem 0.5rem; 
-    border-top-right-radius: 0.5rem; 
-    border-bottom-right-radius: 0.5rem; 
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+    border-top-left-radius: 0.5rem; /* Changed to left radius */
+    border-bottom-left-radius: 0.5rem; /* Changed to left radius */
+    border-top-right-radius: 0; /* Ensured right radius is 0 */
+    border-bottom-right-radius: 0; /* Ensured right radius is 0 */
     font-weight: 700;
     color: #6D5F53; /* Default text color for neutral state */
     transition: background-color 0.3s ease;
@@ -323,18 +360,18 @@ body {
     background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
 }
 
-.task-type-button.btn-tasks { /* Red when tasks are not completed */
+/* Task button states based on completion and reports */
+.task-type-button.tasks-incomplete-with-reports { /* Red when tasks are not completed but there are reports for today */
     background-color: #ef4444; 
     color: #FFFFFF; /* Ensure text is white on red */
 }
-.task-type-button.btn-tasks:hover {
+.task-type-button.tasks-incomplete-with-reports:hover {
     background-color: #dc2626; 
 }
-.task-type-button.completed-tasks { /* Green when all tasks are completed */
+.task-type-button.all-tasks-completed { /* Green when all tasks are completed for today */
     background-color: #22c55e; 
     color: #FFFFFF; /* Ensure text is white on green */
 }
-.task-type-button.completed-tasks:hover {
+.task-type-button.all-tasks-completed:hover {
     background-color: #16a34a; 
 }
-
