@@ -1859,7 +1859,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // onSnapshot will re-render table automatically
         } catch (error) {
             console.error("Error deleting day's reports: ", error);
-            showCustomAlert(`שגיאה במחיקת דיווחי היום: ${error.message}`);
+            showCustomAlert(`שגיאה במחיקת דיווחי היום: ${e.message}`);
         }
     };
 
@@ -1918,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isSearchInputVisible) {
                     searchInput.focus();
                 } else {
-                    searchInput.value = ''; 
+                    searchInput.value = '';
                     performSearch(); 
                 }
             }
