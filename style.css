@@ -45,7 +45,7 @@ body {
 }
 
 .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 10%; /* Kept as requested */
+    width: 10%; /* Kept compact for time */
     min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align time */
 }
@@ -193,31 +193,35 @@ body {
 
 /* Hide columns on mobile for better readability */
 @media (max-width: 639px) { /* Targets screens smaller than 640px */
-    .table-cell-desktop-only {
-        display: none;
+    .table-container th:nth-child(3), /* שם המדווח */
+    .table-container td:nth-child(3),
+    .table-container th:nth-child(4), /* שיוך יומן */
+    .table-container td:nth-child(4) {
+        display: none !important; /* Force hide these columns */
     }
+
     /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
     #reportTableBody #empty-state td,
     #reportTableBody #loading-state td {
         colspan: 3;
     }
-    .table-cell-mobile-only {
-        display: table-cell; /* Ensure this is visible on mobile */
-    }
-    /* Mobile specific column widths */
+
+    /* Mobile specific column widths for the remaining visible columns */
     .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 50%; /* Adjusted for more content space on mobile */
+        width: 60%; /* Increased for more content space on mobile */
         text-align: right; /* Ensure alignment */
+        white-space: normal; /* Allow text to wrap */
+        word-break: break-word; /* Break long words if necessary */
     }
     .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-        width: 20%; /* Kept compact for time */
+        width: 15%; /* Kept compact for time, slight increase */
         text-align: center; /* Ensure alignment */
     }
     .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 30%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
+        width: 25%; /* Adjusted to ensure buttons fit */
         text-align: center; /* Ensure alignment */
     }
-    /* Ensure no wrapping in headers or actions that would stretch rows too much */
+    /* Ensure no wrapping in headers that would stretch rows too much */
     .table-container th {
         white-space: nowrap; /* Prevent headers from wrapping */
         overflow: hidden;
@@ -225,8 +229,8 @@ body {
     }
     /* Adjust font size for actions on mobile if necessary to fit */
     .table-cell button, .table-cell span {
-        font-size: 0.75rem; /* Smaller font for buttons/spans in action column */
-        padding: 0.25rem 0.5rem; /* Adjust padding for smaller buttons */
+        font-size: 0.7rem; /* Even smaller font for buttons/spans in action column */
+        padding: 0.2rem 0.4rem; /* Adjust padding for smaller buttons */
         min-width: unset; /* Remove min-width that might stretch */
     }
     /* Adjusting daily summary text alignment on mobile to prevent overflow */
@@ -244,7 +248,7 @@ body {
         align-self: flex-start; /* Align to the start of the td content */
         margin-left: 0; /* Remove extra margin on mobile */
         margin-right: 0.5rem; /* Add some space between button and text */
-        padding: 0.2rem;
+        padding: 0.1rem; /* Smaller padding */
     }
     .date-group-header td {
         display: flex; /* Use flexbox for the date header cell */
@@ -270,11 +274,12 @@ body {
 
 /* Ensure mobile-only cells are hidden on desktop */
 @media (min-width: 640px) {
-    .table-cell-mobile-only {
-        display: none;
-    }
-    .table-cell-desktop-only {
-        display: table-cell; /* Ensure these are visible on desktop */
+    /* Ensure these columns are visible on desktop */
+    .table-container th:nth-child(3), /* שם המדווח */
+    .table-container td:nth-child(3),
+    .table-container th:nth-child(4), /* שיוך יומן */
+    .table-container td:nth-child(4) {
+        display: table-cell !important;
     }
     /* Reset colspan for desktop (5 visible columns now: דיווח, שעה, מדווח, שיוך, פעולות) */
     #reportTableBody #empty-state td,
