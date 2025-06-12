@@ -981,7 +981,6 @@ const updateTasksButtonStates = () => {
     
     // Filter reports relevant to today
     const relevantReportsToday = reports.filter(report => report.date === todayKey);
-    // Get all log types that have reports for today
     const logTypesWithReportsToday = new Set(relevantReportsToday.map(r => r.logType));
 
     // Sort definedLogTypes based on a custom order for display
@@ -1010,39 +1009,46 @@ const updateTasksButtonStates = () => {
         button.dataset.logType = logType;
         button.textContent = logType;
 
-        let allCompletedForToday = true;
-        let hasIncompleteTasks = false; // Flag to check if any task for this type is incomplete
-        
-        // Check if there are any *incomplete* tasks for this type
+        let allTasksCompleted = true;     // True if all tasks are checked
+        let hasSomeCompletedTasks = false; // True if at least one task is checked
+        let hasIncompleteTasks = false;    // True if at least one task is unchecked
+
         if (tasksForType.length > 0) {
             for (const task of tasksForType) {
                 const isCompleted = completedTasks[logType] && completedTasks[logType][task.id];
-                if (!isCompleted) {
-                    allCompletedForToday = false;
+                if (isCompleted) {
+                    hasSomeCompletedTasks = true;
+                } else {
+                    allTasksCompleted = false; // If even one is not completed, then not all are completed
                     hasIncompleteTasks = true;
                 }
             }
         } else {
-            // If no tasks are defined for this log type, consider them "completed"
-            allCompletedForToday = true;
+            // If no tasks are defined, they are "all completed" in a sense (nothing to do)
+            allTasksCompleted = true; 
+            hasSomeCompletedTasks = false; // No tasks means no *some* completed tasks
+            hasIncompleteTasks = false; // No tasks means no incomplete tasks
         }
 
         // Determine button color based on the new logic
-        if (allCompletedForToday && tasksForType.length > 0) { // All tasks completed for this type, AND there are tasks
-            button.classList.add('all-tasks-completed'); // Green
-            button.classList.remove('tasks-incomplete-with-reports'); // Ensure no red
-        } else if (hasIncompleteTasks && logTypesWithReportsToday.has(logType)) { 
-            // Has incomplete tasks AND there is at least one report for this logType for today
-            button.classList.add('tasks-incomplete-with-reports'); // Red
-            button.classList.remove('all-tasks-completed'); // Ensure no green
+        if (tasksForType.length > 0 && allTasksCompleted) {
+            // ירוק: כל המשימות הושלמו (ויש משימות קיימות)
+            button.classList.add('all-tasks-completed');
+            button.classList.remove('tasks-incomplete-with-reports');
+        } else if (tasksForType.length > 0 && hasSomeCompletedTasks && hasIncompleteTasks && logTypesWithReportsToday.has(logType)) {
+            // אדום: משימות קיימות, חלקן הושלמו וחלקן לא, וגם קיימים דיווחים כלליים לשיוך זה מהיום
+            button.classList.add('tasks-incomplete-with-reports');
+            button.classList.remove('all-tasks-completed');
         } else {
-            // Default gray/neutral color (already set in CSS)
+            // אפור (ברירת מחדל): כל שאר המצבים
+            // - אין משימות מוגדרות כלל (tasksForType.length === 0)
+            // - יש משימות, אך אף אחת מהן לא הושלמה (allTasksCompleted === false, hasSomeCompletedTasks === false)
+            // - יש משימות שהושלמו חלקית, אך אין דיווחים כלליים לשיוך זה מהיום
             button.classList.remove('tasks-incomplete-with-reports');
             button.classList.remove('all-tasks-completed');
         }
 
         button.addEventListener('click', () => {
-            // The panel opens from the right
             const isPanelOpenForThisType = tasksPanel.classList.contains('is-open') && 
                                            tasksLogTypeDisplay.textContent === logType;
             
