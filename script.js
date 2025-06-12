@@ -1488,6 +1488,22 @@ const removeTaskFromLogType = async (logTypeName, taskId) => {
         const docRef = doc(db, `artifacts/${appId}/public/data/log_types`, logTypeObj.id);
         await updateDoc(docRef, { tasks: updatedTasks });
         showCustomAlert(`משימה הוסרה משיוך "${logTypeName}" בהצלחה.`);
+
+        // --- NEW: Delete corresponding auto-generated reports from the main reports collection ---
+        const taskReportIdPrefix = `task-${logTypeName}-${taskId}`;
+        const q = query(reportsCollectionRef, where("isTaskReport", "==", true), where("taskReportId", "==", taskReportIdPrefix));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const batch = writeBatch(db);
+            querySnapshot.docs.forEach(docToDelete => {
+                batch.delete(doc(db, `artifacts/${appId}/public/data/reports`, docToDelete.id));
+            });
+            await batch.commit();
+            console.log(`Deleted all auto-generated reports for task "${taskId}" under log type "${logTypeName}".`);
+        }
+        // --- END NEW ---
+
     } catch (e) {
         console.error("Error removing task from log type: ", e);
         showCustomAlert(`שגיאה בהסרת משימה: ${e.message}`);
@@ -2093,9 +2109,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.addEventListener('click', (e) => {
                     const taskIdToRemove = e.target.dataset.taskId;
                     const logTypeToRemove = e.target.dataset.logType;
-                    removeTaskFromLogType(logTypeToRemove, taskIdToRemove);
-                    // Re-render the list after deletion to reflect changes
-                    // Wait for Firestore listener to update definedLogTypes, then re-render
+                    // Confirm before removing the task and its reports
+                    showCustomAlert(`האם אתה בטוח שברצונך להסיר משימה זו (${e.target.previousElementSibling.textContent}) וכל הדיווחים שנוצרו עבורה?`);
+                    customAlert.dataset.confirmAction = 'removeTask';
+                    customAlert.dataset.taskIdToRemove = taskIdToRemove;
+                    customAlert.dataset.logTypeToRemove = logTypeToRemove;
                 });
             });
         }
@@ -2140,6 +2158,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     delete customAlert.dataset.confirmAction;
                     delete customAlert.dataset.reporterIdToDelete;
+                } else if (customAlert.dataset.confirmAction === 'removeTask') { // NEW: Handle remove task confirmation
+                    const taskIdToRemove = customAlert.dataset.taskIdToRemove;
+                    const logTypeToRemove = customAlert.dataset.logTypeToRemove;
+                    if (taskIdToRemove && logTypeToRemove) {
+                        removeTaskFromLogType(logTypeToRemove, taskIdToRemove);
+                    }
+                    delete customAlert.dataset.confirmAction;
+                    delete customAlert.dataset.taskIdToRemove;
+                    delete customAlert.dataset.logTypeToRemove;
                 }
             }
         });
