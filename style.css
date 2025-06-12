@@ -1,4 +1,8 @@
 /* style.css */
+*, *::before, *::after { /* Global box-sizing for consistent layout */
+    box-sizing: border-box;
+}
+
 html, body {
     height: 100%; /* Ensure html and body take full viewport height */
     margin: 0;
@@ -35,6 +39,11 @@ body {
 .table-container table {
     table-layout: fixed; /* Ensures column widths are honored */
     width: 100%; /* Make sure table takes full width */
+}
+
+/* Add overflow-x to table container for mobile responsiveness */
+.table-container {
+    overflow-x: auto; /* Allows horizontal scrolling if content overflows */
 }
 
 /* Updated column widths for better mobile visibility */
