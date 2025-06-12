@@ -1918,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isSearchInputVisible) {
                     searchInput.focus();
                 } else {
-                    searchInput.value = '';
+                    searchInput.value = ''; 
                     performSearch(); 
                 }
             }
