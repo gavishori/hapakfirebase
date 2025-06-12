@@ -206,13 +206,13 @@ body {
     }
     /* Mobile specific column widths */
     .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 55%; /* More space for description on mobile, allows wrapping */
+        width: 50%; /* Adjusted for more content space on mobile */
     }
     .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-        width: 20%; /* Keep time visible */
+        width: 20%; /* Kept compact for time */
     }
     .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 25%; /* Ensure actions are visible and has enough space */
+        width: 30%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
     }
 }
 
