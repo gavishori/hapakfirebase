@@ -24,7 +24,8 @@ import {
     getDocs, 
     query, 
     where,
-    writeBatch 
+    writeBatch,
+    updateDoc // Added updateDoc for editing existing reporters
 } from './firebase.js'; 
 
 // Firestore collection references
@@ -107,7 +108,7 @@ let allTasksCompletedMessage;
 
 // Reporters Modal DOM references
 let reportersModal;
-let closeReportersModalBtn; // Correctly referenced
+let closeReportersModalBtn; 
 let newReporterNameInput;
 let addReporterBtn;
 let reportersListUl;
@@ -356,8 +357,7 @@ const renderTable = (searchTerm = '') => {
 
             reportRow.innerHTML = `
                 <td class="table-cell">${highlightText(report.description, searchTerm)}</td>
-                <td class="table-cell">${report.time}</td> <!-- Moved time here -->
-                <td class="table-cell table-cell-desktop-only">${highlightText(report.reporter, searchTerm)}</td>
+                <td class="table-cell">${report.time}</td> <td class="table-cell table-cell-desktop-only">${highlightText(report.reporter, searchTerm)}</td>
                 <td class="table-cell table-cell-desktop-only">${highlightText(report.logType, searchTerm)}</td> 
                 <td class="table-cell text-center whitespace-nowrap">
                     ${canEdit ? `<button data-id="${report.id}" class="text-blue-600 hover:text-blue-800 font-semibold edit-btn">ערוך</button>` : `<span class="text-gray-400">לא ניתן לערוך</span>`}
@@ -651,10 +651,10 @@ const handleAuthState = async (user) => {
             unsubscribeFromReporters = onSnapshot(reportersCollectionRef, async (snapshot) => {
                 const fetchedReporters = [];
                 snapshot.forEach(doc => {
-                    fetchedReporters.push(doc.data().name); 
+                    fetchedReporters.push({ id: doc.id, name: doc.data().name }); // Fetch ID as well
                 });
-                populateReportersDropdown(fetchedReporters);
-                renderReportersInModal(fetchedReporters);
+                populateReportersDropdown(fetchedReporters.map(r => r.name)); // Pass only names to dropdown
+                renderReportersInModal(fetchedReporters); // Pass objects to modal for editing
                 
                 // Add default reporters only if the collection is empty AND the flag is not set
                 // Use snapshot.size instead of .empty to be more robust
@@ -846,9 +846,9 @@ const performSearch = () => {
 
 
 // --- Reporters Management ---
-let currentReporters = []; 
+let currentReporters = []; // Stores objects {id: ..., name: ...}
 
-const populateReportersDropdown = (reportersArray) => {
+const populateReportersDropdown = (reportersNamesArray) => {
     if (filterReporter) {
         filterReporter.innerHTML = ''; 
         const defaultOption = document.createElement('option');
@@ -856,19 +856,19 @@ const populateReportersDropdown = (reportersArray) => {
         defaultOption.textContent = 'בחר מדווח';
         filterReporter.appendChild(defaultOption);
 
-        if (reportersArray.length === 0) {
+        if (reportersNamesArray.length === 0) {
             filterReporter.disabled = true;
         } else {
-            reportersArray.sort((a,b) => a.localeCompare(b, 'he')); 
-            reportersArray.forEach(reporter => {
+            reportersNamesArray.sort((a,b) => a.localeCompare(b, 'he')); 
+            reportersNamesArray.forEach(name => {
                 const option = document.createElement('option');
-                option.value = reporter;
-                option.textContent = reporter;
+                option.value = name;
+                option.textContent = name;
                 filterReporter.appendChild(option);
             });
             filterReporter.disabled = false;
         }
-        currentReporters = reportersArray; 
+        // currentReporters is now populated by onSnapshot directly with objects
     }
 };
 
@@ -879,22 +879,83 @@ const renderReportersInModal = (reportersArray) => {
             reportersListUl.innerHTML = '<li class="p-4 text-center text-gray-500">אין מדווחים מוגדרים.</li>';
             return;
         }
-        reportersArray.sort((a,b) => a.localeCompare(b, 'he')); 
+        reportersArray.sort((a,b) => a.name.localeCompare(b.name, 'he')); 
         reportersArray.forEach(reporter => {
             const li = document.createElement('li');
             li.className = 'reporters-list-item';
+            // Display reporter name
             li.innerHTML = `
-                <span>${reporter}</span>
-                <button data-name="${reporter}">מחק</button>
+                <span data-id="${reporter.id}" class="reporter-name-display">${reporter.name}</span>
+                <input type="text" class="reporter-name-edit hidden" value="${reporter.name}" data-id="${reporter.id}">
+                <div class="reporter-actions">
+                    <button class="edit-reporter-btn text-blue-600 hover:text-blue-800 font-semibold py-1 px-2 rounded-md text-sm">ערוך</button>
+                    <button class="save-reporter-btn text-green-600 hover:text-green-800 font-semibold py-1 px-2 rounded-md text-sm hidden">שמור</button>
+                    <button class="delete-reporter-btn text-red-500 hover:text-red-700 font-semibold py-1 px-2 rounded-md text-sm">מחק</button>
+                    <button class="cancel-reporter-btn text-gray-500 hover:text-gray-700 font-semibold py-1 px-2 rounded-md text-sm hidden">ביטול</button>
+                </div>
             `;
             reportersListUl.appendChild(li);
         });
 
-        // Add event listener for delete buttons
-        reportersListUl.querySelectorAll('button').forEach(button => {
+        // Add event listeners for new buttons
+        reportersListUl.querySelectorAll('.delete-reporter-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const nameToDelete = e.target.dataset.name;
-                await deleteReporterFromFirestore(nameToDelete);
+                const idToDelete = e.target.closest('.reporters-list-item').querySelector('.reporter-name-display').dataset.id;
+                const nameToDelete = e.target.closest('.reporters-list-item').querySelector('.reporter-name-display').textContent;
+                showCustomAlert(`האם אתה בטוח שברצונך למחוק את המדווח "${nameToDelete}"?`);
+                customAlert.dataset.confirmAction = 'deleteReporter';
+                customAlert.dataset.reporterIdToDelete = idToDelete;
+            });
+        });
+
+        reportersListUl.querySelectorAll('.edit-reporter-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const listItem = e.target.closest('.reporters-list-item');
+                const nameDisplay = listItem.querySelector('.reporter-name-display');
+                const nameInput = listItem.querySelector('.reporter-name-edit');
+                const editBtn = listItem.querySelector('.edit-reporter-btn');
+                const saveBtn = listItem.querySelector('.save-reporter-btn');
+                const deleteBtn = listItem.querySelector('.delete-reporter-btn');
+                const cancelBtn = listItem.querySelector('.cancel-reporter-btn');
+
+                nameDisplay.classList.add('hidden');
+                nameInput.classList.remove('hidden');
+                editBtn.classList.add('hidden');
+                saveBtn.classList.remove('hidden');
+                deleteBtn.classList.add('hidden');
+                cancelBtn.classList.remove('hidden');
+                nameInput.focus();
+            });
+        });
+
+        reportersListUl.querySelectorAll('.save-reporter-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const listItem = e.target.closest('.reporters-list-item');
+                const nameInput = listItem.querySelector('.reporter-name-edit');
+                const idToUpdate = nameInput.dataset.id;
+                const newName = nameInput.value.trim();
+                await updateReporterInFirestore(idToUpdate, newName);
+                // UI will re-render via onSnapshot listener
+            });
+        });
+
+        reportersListUl.querySelectorAll('.cancel-reporter-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const listItem = e.target.closest('.reporters-list-item');
+                const nameDisplay = listItem.querySelector('.reporter-name-display');
+                const nameInput = listItem.querySelector('.reporter-name-edit');
+                const editBtn = listItem.querySelector('.edit-reporter-btn');
+                const saveBtn = listItem.querySelector('.save-reporter-btn');
+                const deleteBtn = listItem.querySelector('.delete-reporter-btn');
+                const cancelBtn = listItem.querySelector('.cancel-reporter-btn');
+
+                nameDisplay.classList.remove('hidden');
+                nameInput.classList.add('hidden');
+                editBtn.classList.remove('hidden');
+                saveBtn.classList.add('hidden');
+                deleteBtn.classList.remove('hidden');
+                cancelBtn.classList.add('hidden');
+                nameInput.value = nameDisplay.textContent; // Revert input value
             });
         });
     }
@@ -905,7 +966,7 @@ const openReportersModal = () => {
         reportersModal.classList.remove('hidden');
         if (newReporterNameInput) newReporterNameInput.value = ''; 
         if (reporterErrorMessage) reporterErrorMessage.textContent = ''; 
-        renderReportersInModal(currentReporters); 
+        // renderReportersInModal is called by onSnapshot listener automatically
     }
 };
 
@@ -930,7 +991,7 @@ const addReporterToFirestore = async (name) => {
         showCustomAlert('שם המדווח אינו יכול להיות רישום ריק.'); // Add custom alert
         return;
     }
-    if (currentReporters.includes(name.trim())) {
+    if (currentReporters.some(r => r.name === name.trim())) { // Check names from objects
         if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח בשם זה כבר קיים.';
         showCustomAlert('מדווח בשם זה כבר קיים.'); // Add custom alert
         return;
@@ -950,7 +1011,35 @@ const addReporterToFirestore = async (name) => {
     }
 };
 
-const deleteReporterFromFirestore = async (name) => {
+const updateReporterInFirestore = async (id, newName) => {
+    if (!reportersCollectionRef || !auth.currentUser) {
+        const msg = 'שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה לעדכון. אנא התחבר ונסה שוב.';
+        console.error(msg);
+        showCustomAlert(msg);
+        return;
+    }
+    if (!newName || newName.trim() === '') {
+        showCustomAlert('שם המדווח אינו יכול להיות ריק.');
+        return;
+    }
+    if (currentReporters.some(r => r.id !== id && r.name === newName.trim())) {
+        showCustomAlert('מדווח בשם זה כבר קיים.');
+        return;
+    }
+
+    try {
+        const docRef = doc(db, `artifacts/${appId}/public/data/reporters`, id);
+        await updateDoc(docRef, { name: newName.trim() });
+        console.log(`Reporter ID ${id} updated to "${newName}".`);
+        showCustomAlert(`שם המדווח עודכן בהצלחה ל: "${newName}"`);
+    } catch (e) {
+        console.error("Error updating reporter: ", e);
+        showCustomAlert(`שגיאה בעדכון מדווח: ${e.message}`);
+    }
+};
+
+
+const deleteReporterFromFirestore = async (id) => { // Now accepts ID
     // Ensure Firebase references are available and user is authenticated
     if (!reportersCollectionRef || !auth.currentUser) {
         const msg = 'שגיאה: אימות נדרש או מערכת הנתונים אינה זמינה למחיקה. אנא התחבר ונסה שוב.';
@@ -959,19 +1048,10 @@ const deleteReporterFromFirestore = async (name) => {
         return;
     }
     try {
-        const q = query(reportersCollectionRef, where("name", "==", name));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            const docToDelete = querySnapshot.docs[0];
-            await deleteDoc(doc(db, `artifacts/${appId}/public/data/reporters`, docToDelete.id));
-            console.log(`Reporter "${name}" deleted.`);
-            if (reporterErrorMessage) reporterErrorMessage.textContent = '';
-            showCustomAlert(`המדווח "${name}" נמחק בהצלחה.`);
-        } else {
-            console.warn(`Reporter "${name}" not found for deletion.`);
-            if (reporterErrorMessage) reporterErrorMessage.textContent = 'מדווח לא נמצא.';
-            showCustomAlert(`מדווח "${name}" לא נמצא למחיקה.`);
-        }
+        await deleteDoc(doc(db, `artifacts/${appId}/public/data/reporters`, id)); // Use ID directly
+        console.log(`Reporter ID ${id} deleted.`);
+        if (reporterErrorMessage) reporterErrorMessage.textContent = '';
+        showCustomAlert(`המדווח נמחק בהצלחה.`);
     } catch (e) {
         console.error("Error deleting reporter: ", e);
         const errorMessage = `שגיאה במחיקת מדווח מ-Firestore: ${e.message} (קוד: ${e.code || 'לא ידוע'})`;
@@ -1468,7 +1548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Reporters Modal DOM references
     reportersModal = document.getElementById('reportersModal');
-    closeReportersModalBtn = document.getElementById('closeReportersModalBtn'); // Correct variable assignment
+    closeReportersModalBtn = document.getElementById('closeReportersModalBtn'); 
     newReporterNameInput = document.getElementById('newReporterName');
     addReporterBtn = document.getElementById('addReporterBtn'); 
     reportersListUl = document.getElementById('reportersList');
@@ -2053,6 +2133,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     delete customAlert.dataset.confirmAction;
                     delete customAlert.dataset.dateToDelete;
+                } else if (customAlert.dataset.confirmAction === 'deleteReporter') { // New: Handle delete reporter confirmation
+                    const reporterIdToDelete = customAlert.dataset.reporterIdToDelete;
+                    if (reporterIdToDelete) {
+                        deleteReporterFromFirestore(reporterIdToDelete);
+                    }
+                    delete customAlert.dataset.confirmAction;
+                    delete customAlert.dataset.reporterIdToDelete;
                 }
             }
         });
