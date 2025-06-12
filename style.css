@@ -207,12 +207,64 @@ body {
     /* Mobile specific column widths */
     .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
         width: 50%; /* Adjusted for more content space on mobile */
+        text-align: right; /* Ensure alignment */
     }
     .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
         width: 20%; /* Kept compact for time */
+        text-align: center; /* Ensure alignment */
     }
     .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
         width: 30%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
+        text-align: center; /* Ensure alignment */
+    }
+    /* Ensure no wrapping in headers or actions that would stretch rows too much */
+    .table-container th {
+        white-space: nowrap; /* Prevent headers from wrapping */
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    /* Adjust font size for actions on mobile if necessary to fit */
+    .table-cell button, .table-cell span {
+        font-size: 0.75rem; /* Smaller font for buttons/spans in action column */
+        padding: 0.25rem 0.5rem; /* Adjust padding for smaller buttons */
+        min-width: unset; /* Remove min-width that might stretch */
+    }
+    /* Adjusting daily summary text alignment on mobile to prevent overflow */
+    .daily-summary {
+        display: block; /* Make it a block element to take its own line if needed */
+        font-size: 0.7rem; /* Slightly smaller font for summary */
+        text-align: right; /* Align right */
+        white-space: normal; /* Allow text to wrap if it's very long */
+        word-break: break-word; /* Break long words */
+        margin-top: 0.25rem; /* Add a small top margin */
+    }
+    /* Ensure the toggle button does not take up too much space and aligns well */
+    .toggle-day-btn {
+        flex-shrink: 0; /* Prevent it from shrinking */
+        align-self: flex-start; /* Align to the start of the td content */
+        margin-left: 0; /* Remove extra margin on mobile */
+        margin-right: 0.5rem; /* Add some space between button and text */
+        padding: 0.2rem;
+    }
+    .date-group-header td {
+        display: flex; /* Use flexbox for the date header cell */
+        flex-wrap: wrap; /* Allow content to wrap */
+        align-items: center; /* Align items vertically */
+        justify-content: flex-start; /* Align to start (right for RTL) */
+    }
+    /* Make the date text part align correctly with the summary below it */
+    .date-group-header td > span:first-of-type { /* This targets the actual date string */
+        flex-grow: 1; /* Allow the date text to grow and take available space */
+        text-align: right;
+        margin-left: 0.5rem; /* Space before date text */
+    }
+    .date-group-header td .text-blue-600 { /* This is the toggle button */
+        order: 1; /* Place toggle button first (on the right in RTL) */
+    }
+    .date-group-header td .daily-summary {
+        order: 3; /* Place summary after date and toggle */
+        width: 100%; /* Take full width below the date */
+        text-align: right;
     }
 }
 
@@ -228,6 +280,10 @@ body {
     #reportTableBody #empty-state td,
     #reportTableBody #loading-state td {
         colspan: 5;
+    }
+    /* Ensure daily summary is hidden on desktop by default */
+    .daily-summary {
+        display: none;
     }
 }
 
