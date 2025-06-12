@@ -107,7 +107,7 @@ let allTasksCompletedMessage;
 
 // Reporters Modal DOM references
 let reportersModal;
-let closeReportersModalBtn;
+let closeReportersModalBtn; // Correctly referenced
 let newReporterNameInput;
 let addReporterBtn;
 let reportersListUl;
@@ -273,6 +273,17 @@ const renderTable = (searchTerm = '') => {
         const isToday = dateKey === todayKey;
         const isCollapsed = searchTerm ? false : collapsedGroups.has(dateKey); 
 
+        // Generate a one-line summary for the day
+        let dailySummary = '';
+        if (reportsForDate.length > 0) {
+            const uniqueLogTypes = Array.from(new Set(reportsForDate.map(r => r.logType))).join(', ');
+            dailySummary = ` (${reportsForDate.length} דיווחים, שיוכים: ${uniqueLogTypes})`;
+            // Limit the length of the summary to prevent overflow
+            if (dailySummary.length > 50) {
+                dailySummary = dailySummary.substring(0, 47) + '...';
+            }
+        }
+
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
         
@@ -285,8 +296,27 @@ const renderTable = (searchTerm = '') => {
                     ${isCollapsed ? '◀' : '▼'}
                 </button>
                 ${formatAsDDMMYYYY(dateKey)}
+                <span class="daily-summary text-sm font-normal text-gray-500 ${isCollapsed ? '' : 'hidden'}">
+                    ${dailySummary}
+                </span>
             </td>
         `;
+
+        // Add delete day button only for the allowed user
+        const allowedEmailForDelete = 'gavishori@gmail.com';
+        if (auth.currentUser && auth.currentUser.email === allowedEmailForDelete) {
+            const deleteDayButton = document.createElement('button');
+            deleteDayButton.className = 'text-red-500 hover:text-red-700 font-semibold ml-4';
+            deleteDayButton.textContent = 'מחק יום';
+            deleteDayButton.onclick = async () => {
+                showCustomAlert(`האם אתה בטוח שברצונך למחוק את כל הדיווחים מתאריך ${formatAsDDMMYYYY(dateKey)}?`);
+                customAlert.dataset.confirmAction = 'deleteDay';
+                customAlert.dataset.dateToDelete = dateKey;
+            };
+            // Append delete button to the existing td (or create a new td for it if design requires)
+            headerRow.querySelector('td').appendChild(deleteDayButton);
+        }
+
         tableBody.appendChild(headerRow);
 
         const reportsContainerRow = document.createElement('tr');
@@ -341,6 +371,7 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.appendChild(reportsCell);
         tableBody.appendChild(reportsContainerRow);
         
+        // This part handles initial collapse and toggling, ensure summary visibility is controlled
         if (!isToday && !collapsedGroups.has(dateKey) && !searchTerm) { 
             collapsedGroups.add(dateKey); 
             reportsContainerRow.classList.add('hidden'); 
@@ -349,20 +380,32 @@ const renderTable = (searchTerm = '') => {
                 toggleButton.textContent = '◀'; 
             }
         }
+        // Ensure summary is hidden when expanded and visible when collapsed
+        const summarySpan = headerRow.querySelector('.daily-summary');
+        if (summarySpan) {
+            if (isCollapsed) {
+                summarySpan.classList.remove('hidden');
+            } else {
+                summarySpan.classList.add('hidden');
+            }
+        }
     });
     
     tableBody.querySelectorAll('.toggle-day-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const dateToToggle = e.target.dataset.toggleDate;
             const contentRow = tableBody.querySelector(`tr[data-content-date="${dateToToggle}"]`);
+            const summarySpan = e.target.parentNode.querySelector('.daily-summary'); // Get the summary span
             if (contentRow) {
                 contentRow.classList.toggle('hidden');
                 if (contentRow.classList.contains('hidden')) {
                     e.target.textContent = '◀';
                     collapsedGroups.add(dateToToggle);
+                    if (summarySpan) summarySpan.classList.remove('hidden'); // Show summary when collapsed
                 } else {
                     e.target.textContent = '▼';
                     collapsedGroups.delete(dateToToggle);
+                    if (summarySpan) summarySpan.classList.add('hidden'); // Hide summary when expanded
                 }
             }
         });
@@ -1425,7 +1468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Reporters Modal DOM references
     reportersModal = document.getElementById('reportersModal');
-    closeReportersModalBtn = document.getElementById('closeReportersModalBtn');
+    closeReportersModalBtn = document.getElementById('closeReportersModalBtn'); // Correct variable assignment
     newReporterNameInput = document.getElementById('newReporterName');
     addReporterBtn = document.getElementById('addReporterBtn'); 
     reportersListUl = document.getElementById('reportersList');
@@ -1457,11 +1500,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('addReporterBtn element not found! Cannot attach event listener.');
     }
     
-    // Attach event listener for closeReportersModalBtn
+    // Attach event listener for closeTasksPanelBtn (original tasks panel close)
     if (closeTasksPanelBtn) {
-        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false)); // Close on X click
+        closeTasksPanelBtn.addEventListener('click', () => toggleTasksPanel(false)); 
     } else {
         console.error('closeTasksPanelBtn element not found! Cannot attach event listener.');
+    }
+
+    // Attach event listener for closeReportersModalBtn (specific to reporters modal)
+    if (closeReportersModalBtn) {
+        closeReportersModalBtn.addEventListener('click', closeReportersModal);
+    } else {
+        console.error('closeReportersModalBtn element not found! Cannot attach event listener.');
     }
 
 
@@ -1601,6 +1651,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.toggle-day-btn').forEach(button => {
                 button.textContent = '▼'; 
             });
+            document.querySelectorAll('.daily-summary').forEach(span => { // Hide summary when expanded
+                span.classList.add('hidden');
+            });
         });
     } else {
         console.error('expandAllBtn element not found!');
@@ -1617,6 +1670,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             document.querySelectorAll('.toggle-day-btn').forEach(button => {
                 button.textContent = '◀'; 
+            });
+            document.querySelectorAll('.daily-summary').forEach(span => { // Show summary when collapsed
+                span.classList.remove('hidden');
             });
         });
     } else {
@@ -1704,6 +1760,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // --- Delete Day Functionality (new) ---
+    const deleteDayReports = async (dateToDelete) => {
+        try {
+            const q = query(reportsCollectionRef, where("date", "==", dateToDelete));
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.empty) {
+                showCustomAlert(`אין דיווחים למחיקה בתאריך ${formatAsDDMMYYYY(dateToDelete)}.`);
+                return;
+            }
+
+            const batch = writeBatch(db);
+            querySnapshot.docs.forEach(docToDelete => {
+                batch.delete(doc(db, `artifacts/${appId}/public/data/reports`, docToDelete.id));
+            });
+            await batch.commit();
+            showCustomAlert(`כל הדיווחים מתאריך ${formatAsDDMMYYYY(dateToDelete)} נמחקו בהצלחה!`);
+            // onSnapshot will re-render table automatically
+        } catch (error) {
+            console.error("Error deleting day's reports: ", error);
+            showCustomAlert(`שגיאה במחיקת דיווחי היום: ${error.message}`);
+        }
+    };
+
 
     // --- Clock Event Listeners ---
     if (assessmentTimePlusBtn) {
@@ -1764,6 +1843,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
+    }
+
+    // Add event listener for search input to perform live search
+    if (searchInput) {
+        searchInput.addEventListener('input', performSearch);
     }
 
     if (exportExcelBtn) {
@@ -1962,6 +2046,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     delete customAlert.dataset.confirmAction;
                     delete customAlert.dataset.reportIdToDelete;
+                } else if (customAlert.dataset.confirmAction === 'deleteDay') {
+                    const dateToDelete = customAlert.dataset.dateToDelete;
+                    if (dateToDelete) {
+                        deleteDayReports(dateToDelete);
+                    }
+                    delete customAlert.dataset.confirmAction;
+                    delete customAlert.dataset.dateToDelete;
                 }
             }
         });
@@ -2022,7 +2113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 }
                 
-                // Convert Excel date (number) to YYYY-MM-DD string
+                // Convert Excel date (number) to IHDA-MM-DD string
                 // Excel dates are days since 1900-01-01 (or 1904-01-01 for Mac, usually 1900)
                 if (typeof reportData.date === 'number') {
                     const excelEpoch = new Date('1899-12-30T00:00:00Z'); // Excel's day 1 is 1900-01-01
@@ -2030,10 +2121,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const dateObj = new Date(excelEpoch.getTime() + reportData.date * msPerDay);
                     reportData.date = dateObj.toISOString().split('T')[0];
                 } else if (typeof reportData.date === 'string') {
-                    // Try to parse string dates into YYYY-MM-DD
+                    // Try to parse string dates into IHDA-MM-DD
                     const parsedDate = new Date(reportData.date);
                     if (isNaN(parsedDate.getTime())) {
-                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: YYYY-MM-DD או תאריך אקסל נומרי.`);
+                         showCustomAlert(`שגיאת ייבוא: פורמט תאריך שגוי בשורה עבור דיווח "${reportData.description}". פורמט נדרש: IHDA-MM-DD או תאריך אקסל נומרי.`);
                          isValid = false;
                          break;
                     }
