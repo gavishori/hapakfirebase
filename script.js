@@ -236,7 +236,8 @@ const renderTable = (searchTerm = '') => {
     
     if (currentDisplayReports.length === 0) {
         if (emptyStateRow) { 
-            const colspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan: דיווח, שעה, פעולות (mobile) / 5 cols (desktop)
+            // Updated colspan to reflect 5 columns (on desktop) or 3 (on mobile)
+            const colspan = window.innerWidth <= 639 ? 3 : 5; 
             emptyStateRow.querySelector('td').setAttribute('colspan', colspan);
 
             emptyStateRow.classList.remove('hidden'); 
@@ -275,7 +276,8 @@ const renderTable = (searchTerm = '') => {
         const headerRow = document.createElement('tr');
         headerRow.className = 'date-group-header bg-[#F8F5F1] border-b-2 border-[#DCD5CC]';
         
-        const headerColspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan
+        // Updated colspan to reflect 5 columns (on desktop) or 3 (on mobile)
+        const headerColspan = window.innerWidth <= 639 ? 3 : 5; 
 
         headerRow.innerHTML = `
             <td colspan="${headerColspan}" class="p-3 font-bold text-[#6D5F53] text-right">
@@ -292,7 +294,8 @@ const renderTable = (searchTerm = '') => {
         reportsContainerRow.dataset.contentDate = dateKey; 
 
         const reportsCell = document.createElement('td');
-        const reportsCellColspan = window.innerWidth <= 639 ? 3 : 5; // Updated colspan
+        // Updated colspan to reflect 5 columns (on desktop) or 3 (on mobile)
+        const reportsCellColspan = window.innerWidth <= 639 ? 3 : 5; 
         reportsCell.colSpan = reportsCellColspan;
         reportsCell.className = 'p-0'; 
 
@@ -557,6 +560,16 @@ const handleAuthState = async (user) => {
 
         showAppContent(); 
 
+        // Conditional visibility for export/import buttons
+        const allowedEmailForExcel = 'gavishori@gmail.com';
+        if (user.email === allowedEmailForExcel) {
+            if (exportExcelBtn) exportExcelBtn.classList.remove('hidden');
+            if (importExcelBtn) importExcelBtn.classList.remove('hidden');
+        } else {
+            if (exportExcelBtn) exportExcelBtn.classList.add('hidden');
+            if (importExcelBtn) importExcelBtn.classList.add('hidden');
+        }
+
         if (!reportsCollectionRef) {
              reportsCollectionRef = collection(db, `artifacts/${appId}/public/data/reports`);
              console.log('Reports collection path (PUBLIC):', `artifacts/${appId}/public/data/reports`);
@@ -688,6 +701,9 @@ const handleAuthState = async (user) => {
         if (editReportersBtn) {
             editReportersBtn.disabled = true;
         }
+        // Hide export/import buttons if user is logged out
+        if (exportExcelBtn) exportExcelBtn.classList.add('hidden');
+        if (importExcelBtn) importExcelBtn.classList.add('hidden');
     }
     // Resolve the promise once the initial auth state has been handled
     firebaseAuthReadyResolve();
@@ -975,7 +991,7 @@ const updateTasksButtonStates = () => {
     // Clear existing buttons to prevent duplicates on re-render
     taskButtonsContainer.innerHTML = ''; 
 
-    // Get today's date in YYYY-MM-DD format
+    // Get today's date in IHDA-MM-DD format
     const today = new Date();
     const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
     
@@ -1032,18 +1048,18 @@ const updateTasksButtonStates = () => {
 
         // Determine button color based on the new logic
         if (tasksForType.length > 0 && allTasksCompleted) {
-            // ירוק: כל המשימות הושלמו (ויש משימות קיימות)
+            // Green: All tasks are completed (and there are existing tasks)
             button.classList.add('all-tasks-completed');
             button.classList.remove('tasks-incomplete-with-reports');
         } else if (tasksForType.length > 0 && hasSomeCompletedTasks && hasIncompleteTasks && logTypesWithReportsToday.has(logType)) {
-            // אדום: משימות קיימות, חלקן הושלמו וחלקן לא, וגם קיימים דיווחים כלליים לשיוך זה מהיום
+            // Red: Tasks exist, some are completed and some are not, AND there are general reports for this log type from today
             button.classList.add('tasks-incomplete-with-reports');
             button.classList.remove('all-tasks-completed');
         } else {
-            // אפור (ברירת מחדל): כל שאר המצבים
-            // - אין משימות מוגדרות כלל (tasksForType.length === 0)
-            // - יש משימות, אך אף אחת מהן לא הושלמה (allTasksCompleted === false, hasSomeCompletedTasks === false)
-            // - יש משימות שהושלמו חלקית, אך אין דיווחים כלליים לשיוך זה מהיום
+            // Gray (default): All other cases
+            // - No tasks defined at all (tasksForType.length === 0)
+            // - Tasks exist, but none of them are completed (allTasksCompleted === false, hasSomeCompletedTasks === false)
+            // - Tasks are partially completed, but there are no general reports for this log type from today
             button.classList.remove('tasks-incomplete-with-reports');
             button.classList.remove('all-tasks-completed');
         }
@@ -1256,7 +1272,7 @@ const addDefaultLogTypesIfEmpty = async () => {
                 { name: "נעדר", tasks: [
                     { id: 'missing_task_1', text: 'קבלת פרטים מזהים ופרטי לבוש' },
                     { id: 'missing_task_2', text: 'איסוף מידע על נסיבות ההיעלמות' },
-                    { id: 'missing_task_3', text: 'פתיחת סריקה ראשונית באזור' },
+                    { id: 'missing_3', text: 'פתיחת סריקה ראשונית באזור' },
                     { id: 'missing_task_4', text: 'הודעה למשטרה ולגורמי חיפוש' },
                     { id: 'missing_task_5', text: 'גיוס כוחות סיוע (מתנדבים/כלבנים)' },
                 ]},
