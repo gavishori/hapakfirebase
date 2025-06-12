@@ -27,36 +27,50 @@ body {
 
 /* Specific styling for table headers and cells to control width and alignment */
 .table-container th {
-    text-align: center; /* Center align table headers */
+    text-align: center; /* Center align table headers by default */
 }
 
 /* Adjusting column widths for better fit to ensure "פעולות" column is visible */
+/* Apply table-layout: fixed to the table to ensure column widths are respected */
+.table-container table {
+    table-layout: fixed; /* Ensures column widths are honored */
+    width: 100%; /* Make sure table takes full width */
+}
+
+/* Updated column widths for better mobile visibility */
 .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-    width: 60%; /* Allow description to take most space */
+    width: 55%; /* Adjusted for more space */
     text-align: right; /* Align report description to the right */
+    /* Removed overflow: hidden, text-overflow: ellipsis, white-space: nowrap to allow text to wrap */
 }
 
 .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 10%;
+    width: 10%; /* Kept as requested */
     min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align time */
 }
 
 .table-container th:nth-child(3), .table-container td:nth-child(3) { /* שם המדווח */
-    width: 15%;
+    width: 15%; /* Reduced width */
     min-width: 6rem; /* Adjusted for better legibility */
     text-align: center; /* Center align reporter */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך יומן */
-    width: 10%;
+    width: 10%; /* Kept as requested */
     min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align log type */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-    width: 5%; /* Smallest width for actions */
-    min-width: 3rem; /* Minimum width for actions */
+    width: 10%; /* Kept as requested */
+    min-width: 4.5rem; /* Minimum width for actions button */
     text-align: center; /* Center align actions */
 }
 
@@ -65,7 +79,7 @@ body {
     transition: all 0.3s ease;
     /* Ensure a sensible default min-height for textarea */
     min-height: calc(1.5em * 3 + 1rem); /* Roughly 3 lines height + padding for default rows="3" */
-    overflow-y: hidden; /* Important for auto-resize */
+    overflow-y: auto; /* Changed to auto to allow pasted content with newlines to be displayed and scrolled if needed */
     border-radius: 0.5rem; /* rounded-lg equivalent for default form inputs */
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
@@ -190,6 +204,16 @@ body {
     .table-cell-mobile-only {
         display: table-cell; /* Ensure this is visible on mobile */
     }
+    /* Mobile specific column widths */
+    .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
+        width: 55%; /* More space for description on mobile, allows wrapping */
+    }
+    .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
+        width: 20%; /* Keep time visible */
+    }
+    .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
+        width: 25%; /* Ensure actions are visible and has enough space */
+    }
 }
 
 /* Ensure mobile-only cells are hidden on desktop */
@@ -289,7 +313,7 @@ body {
     font-weight: 600;
     transition: background-color 0.3s ease;
 }
-#reportersModal .reporters-list-item button:hover {
+.reporters-list-item button:hover {
     background-color: #dc2626; 
 }
 
@@ -325,13 +349,14 @@ body {
 }
 #headerMenu.open {
     display: block;
-    transform: scale(1) translate(0, 0); /* Ensure correct animation */
+    /* Shifts the menu 50% of its own width to the right from its current positioned location */
+    transform: scale(1) translateX(50%); 
     opacity: 1;
 }
 
 /* Styling for the dynamic tasks buttons container - Adjusted for Right side positioning */
 #taskButtonsContainer {
-    position: fixed; /* Changed from absolute to fixed */
+    position: fixed;
     right: 0; /* Aligned to the right edge */
     left: auto; /* Ensure left is not set */
     top: 50%; 
