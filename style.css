@@ -198,27 +198,31 @@ body {
     .table-container th:nth-child(4), /* שיוך יומן */
     .table-container td:nth-child(4) {
         display: none !important; /* Force hide these columns */
+        width: 0 !important; /* Explicitly set width to 0 */
+        padding: 0 !important; /* Remove padding */
+        border: none !important; /* Remove borders */
     }
 
     /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
     #reportTableBody #empty-state td,
     #reportTableBody #loading-state td {
-        colspan: 3;
+        /* The colspan needs to be set by JS, so leave CSS out here */
+        /* It's already handled in script.js renderTable function */
     }
 
     /* Mobile specific column widths for the remaining visible columns */
     .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 60%; /* Increased for more content space on mobile */
+        width: 65% !important; /* Increased for more content space on mobile, ensure it's not fixed by desktop rule */
         text-align: right; /* Ensure alignment */
         white-space: normal; /* Allow text to wrap */
         word-break: break-word; /* Break long words if necessary */
     }
     .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-        width: 15%; /* Kept compact for time, slight increase */
+        width: 15% !important; /* Kept compact for time, slight increase */
         text-align: center; /* Ensure alignment */
     }
     .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 25%; /* Adjusted to ensure buttons fit */
+        width: 20% !important; /* Adjusted to ensure buttons fit */
         text-align: center; /* Ensure alignment */
     }
     /* Ensure no wrapping in headers that would stretch rows too much */
@@ -229,8 +233,8 @@ body {
     }
     /* Adjust font size for actions on mobile if necessary to fit */
     .table-cell button, .table-cell span {
-        font-size: 0.7rem; /* Even smaller font for buttons/spans in action column */
-        padding: 0.2rem 0.4rem; /* Adjust padding for smaller buttons */
+        font-size: 0.65rem; /* Even smaller font for buttons/spans in action column */
+        padding: 0.15rem 0.3rem; /* Adjust padding for smaller buttons */
         min-width: unset; /* Remove min-width that might stretch */
     }
     /* Adjusting daily summary text alignment on mobile to prevent overflow */
