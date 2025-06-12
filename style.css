@@ -1,8 +1,4 @@
 /* style.css */
-*, *::before, *::after { /* Global box-sizing for consistent layout */
-    box-sizing: border-box;
-}
-
 html, body {
     height: 100%; /* Ensure html and body take full viewport height */
     margin: 0;
@@ -41,12 +37,7 @@ body {
     width: 100%; /* Make sure table takes full width */
 }
 
-/* Add overflow-x to table container for mobile responsiveness */
-.table-container {
-    overflow-x: auto; /* Allows horizontal scrolling if content overflows */
-}
-
-/* Updated column widths for better desktop visibility (default) */
+/* Updated column widths for better mobile visibility */
 .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
     width: 55%; /* Adjusted for more space */
     text-align: right; /* Align report description to the right */
@@ -54,12 +45,12 @@ body {
 }
 
 .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 10%; 
+    width: 10%; /* Kept as requested */
     min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align time */
 }
 
-.table-container th:nth-child(3), .table-container td:nth-child(3) { /* מדווח (שם המדווח) */
+.table-container th:nth-child(3), .table-container td:nth-child(3) { /* שם המדווח */
     width: 15%; /* Reduced width */
     min-width: 6rem; /* Adjusted for better legibility */
     text-align: center; /* Center align reporter */
@@ -68,8 +59,8 @@ body {
     white-space: nowrap;
 }
 
-.table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך (שיוך יומן) */
-    width: 10%; 
+.table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך יומן */
+    width: 10%; /* Kept as requested */
     min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align log type */
     overflow: hidden;
@@ -78,7 +69,7 @@ body {
 }
 
 .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-    width: 10%; 
+    width: 10%; /* Kept as requested */
     min-width: 4.5rem; /* Minimum width for actions button */
     text-align: center; /* Center align actions */
 }
@@ -215,41 +206,33 @@ body {
     }
     /* Mobile specific column widths */
     .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 45%; /* Further adjusted for more content space on mobile */
+        width: 50%; /* Adjusted for more content space on mobile */
         text-align: right; /* Ensure alignment */
-        font-size: 0.8rem; /* Smaller font for main report content */
-        padding: 8px; /* Reduced padding */
     }
     .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
         width: 20%; /* Kept compact for time */
         text-align: center; /* Ensure alignment */
-        font-size: 0.8rem; /* Smaller font */
-        padding: 8px; /* Reduced padding */
     }
     .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 35%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
+        width: 30%; /* Increased to ensure "לא ניתן לערוך" is fully visible */
         text-align: center; /* Ensure alignment */
-        padding: 8px; /* Reduced padding */
     }
     /* Ensure no wrapping in headers or actions that would stretch rows too much */
     .table-container th {
         white-space: nowrap; /* Prevent headers from wrapping */
         overflow: hidden;
         text-overflow: ellipsis;
-        text-align: right; /* Align headers to right on mobile */
-        font-size: 0.85rem; /* Smaller font for headers */
-        padding: 8px; /* Reduced padding */
     }
     /* Adjust font size for actions on mobile if necessary to fit */
     .table-cell button, .table-cell span {
-        font-size: 0.7rem; /* Even smaller font for buttons/spans in action column */
-        padding: 0.2rem 0.4rem; /* Adjust padding for smaller buttons */
+        font-size: 0.75rem; /* Smaller font for buttons/spans in action column */
+        padding: 0.25rem 0.5rem; /* Adjust padding for smaller buttons */
         min-width: unset; /* Remove min-width that might stretch */
     }
     /* Adjusting daily summary text alignment on mobile to prevent overflow */
     .daily-summary {
         display: block; /* Make it a block element to take its own line if needed */
-        font-size: 0.65rem; /* Slightly smaller font for summary */
+        font-size: 0.7rem; /* Slightly smaller font for summary */
         text-align: right; /* Align right */
         white-space: normal; /* Allow text to wrap if it's very long */
         word-break: break-word; /* Break long words */
