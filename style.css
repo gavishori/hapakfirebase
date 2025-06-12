@@ -30,33 +30,33 @@ body {
     text-align: center; /* Center align table headers */
 }
 
-/* Adjusting column widths for better fit (set to 50% of initial values) */
+/* Adjusting column widths for better fit to ensure "פעולות" column is visible */
 .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-    width: auto; /* Let content determine width */
+    width: 60%; /* Allow description to take most space */
     text-align: right; /* Align report description to the right */
 }
 
 .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 3.75%; /* 50% of 7.5% */
-    min-width: 2.25rem; /* 50% of 4.5rem */
+    width: 10%;
+    min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align time */
 }
 
 .table-container th:nth-child(3), .table-container td:nth-child(3) { /* שם המדווח */
-    width: 5.625%; /* 50% of 11.25% */
-    min-width: 3rem; /* 50% of 6rem */
+    width: 15%;
+    min-width: 6rem; /* Adjusted for better legibility */
     text-align: center; /* Center align reporter */
 }
 
 .table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך יומן */
-    width: 3.75%; /* 50% of 7.5% */
-    min-width: 2.25rem; /* 50% of 4.5rem */
+    width: 10%;
+    min-width: 4rem; /* Adjusted for better legibility */
     text-align: center; /* Center align log type */
 }
 
 .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-    width: 3.75%; /* 50% of 7.5% */
-    min-width: 2.25rem; /* 50% of 4.5rem */
+    width: 5%; /* Smallest width for actions */
+    min-width: 3rem; /* Minimum width for actions */
     text-align: center; /* Center align actions */
 }
 
