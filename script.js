@@ -1849,6 +1849,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await deleteDoc(doc(db, `artifacts/${appId}/public/data/reports`, reportId));
             console.log("Document successfully deleted!");
             showCustomAlert('הדיווח נמחק בהצלחה!');
+            resetForm(); // Call resetForm after successful deletion
             // onSnapshot will re-render table automatically
         } catch (error) {
             console.error("Error removing document: ", error);
@@ -1872,10 +1873,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             await batch.commit();
             showCustomAlert(`כל הדיווחים מתאריך ${formatAsDDMMYYYY(dateToDelete)} נמחקו בהצלחה!`);
+            resetForm(); // Call resetForm after successful deletion
             // onSnapshot will re-render table automatically
         } catch (error) {
             console.error("Error deleting day's reports: ", error);
-            showCustomAlert(`שגיאה במחיקת דיווחי היום: ${e.message}`);
+            showCustomAlert(`שגיאה במחיקת דיווחי היום: ${error.message}`);
         }
     };
 
