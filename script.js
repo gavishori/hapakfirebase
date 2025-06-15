@@ -1720,17 +1720,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- Attach Main App Event Listeners ---
-    if (mainActionBtn) { 
-        mainActionBtn.addEventListener('click', () => {
+    // --- Attach Main App Event Listeners ---
+if (mainActionBtn) {
+    mainActionBtn.addEventListener('click', async () => { // Made async to await
+        try {
             if (editingReportIndex === null) {
-                addReport();
+                // NEW: Update the time input to the current time right before adding a new report
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                if (newTimeInput) {
+                    newTimeInput.value = `${hours}:${minutes}`;
+                }
+                await addReport(); // Await the async function
             } else {
-                updateReport();
+                await updateReport(); // Await the async function
             }
-        });
-    } else {
-        console.error('mainActionBtn element not found! Cannot attach event listener.');
-    }
+        } catch (error) {
+            console.error("Main action failed:", error);
+            // Error message already shown by addReport/updateReport functions
+        }
+        // resetIdleTimer() is now handled within addReport/updateReport finally blocks
+    });
+} else {
+    console.error('mainActionBtn element not found! Cannot attach event listener.');
+}
 
     if (cancelEditBtn) { 
         cancelEditBtn.addEventListener('click', resetForm);
