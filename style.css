@@ -1,467 +1,497 @@
-/* style.css */
-html, body {
-    height: 100%; /* Ensure html and body take full viewport height */
-    margin: 0;
+:root{
+  --bg:#0f1115; --card:#151922; --ink:#e9eef4; --muted:#9fb0c0; --brand:#8bd3ff; --accent:#ffd166; --ok:#06d6a0; --danger:#ef476f;
+  --border:#273142; --shadow:0 10px 30px rgba(0,0,0,.25);
+}
+[data-theme="light"]{
+  --bg:#f7f8fb; --card:#ffffff; --ink:#0e1116; --muted:#415266; --brand:#0077ff; --accent:#faad14; --ok:#089e71; --danger:#d9363e; --border:#e6e9ef; --shadow:0 10px 20px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,system-ui,-apple-system,Segoe UI,Roboto,Arial;overflow:hidden;direction:rtl}
+a{color:var(--brand);text-decoration:none}
+.app{display:grid;grid-template-rows:auto 1fr}
+header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
+header .brand{font-weight:700;letter-spacing:.5px}
+header .spacer{flex:1}
+header button, .btn{background:transparent;border:1px solid var(--border);color:var(--ink);padding:8px 12px;border-radius:12px;cursor:pointer}
+.btn.primary{border-color:var(--brand);background:color-mix(in oklab, var(--brand) 20%, transparent)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.container{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 56px)}
+.sidebar{border-inline-start:1px solid var(--border);background:var(--card);padding:16px;overflow:auto}
+.content{padding:16px;overflow:auto}
+
+.section-title{display:flex;align-items:center;gap:10px;margin:8px 0 12px}
+.input, select, textarea{width:100%;background:transparent;border:1px solid var(--border);color:var(--ink);padding:10px 12px;border-radius:10px;outline:none}
+textarea{min-height:80px}
+.row{display:flex;gap:10px}
+.row > *{flex:1}
+
+.list-actions{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);padding-bottom:8px;z-index:4}
+.tabs button{padding:10px 12px;border-radius:12px 12px 0 0;border:1px solid var(--border);border-bottom:none;background:var(--card)}
+.tabs button.active{outline:2px solid color-mix(in oklab, var(--brand) 40%, transparent)}
+
+.trip-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.list{display:flex;flex-direction:column;gap:8px}
+.trip-row{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.trip-row > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.trip-row .pill {
+  width: fit-content;
+  margin-top: 4px;
+}
+.muted{color:var(--muted)}
+.pill{border:1px solid var(--border);padding:4px 8px;border-radius:999px;font-size:.85rem}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:separate;border-spacing:0}
+th,td{border-bottom:1px solid var(--border);padding:10px;text-align:right}
+th{position:sticky;top:0;background:var(--card)}
+
+.menu{position:relative}
+.menu-btn{border:1px solid var(--border);background:transparent;border-radius:10px;padding:6px 10px}
+.menu-list{position:absolute;left:0;top:36px;background:var(--card);border:1px solid var(--border);border-radius:12px;min-width:160px;display:none;z-index:3}
+.menu-list.open{display:block}
+.menu-list button{display:block;width:100%;padding:10px;background:transparent;border:none;text-align:right}
+
+.leaflet-container{height:420px;border-radius:16px;border:1px solid var(--border)}
+.map-toolbar{position:absolute;inset-inline-start:12px;inset-block-start:12px;display:flex;gap:8px;z-index:400}
+
+dialog.modal{border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--ink);padding:0;max-width:420px;width:90%}
+.modal header{padding:12px 16px;border-bottom:1px solid var(--border);background:transparent}
+.modal .body{padding:14px 16px}
+.modal .footer{display:flex;gap:8px;justify-content:flex-start;padding:12px 16px;border-top:1px solid var(--border)}
+
+.toast{position:fixed;inset-inline-end:16px;inset-block-end:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow);display:none}
+.toast.show{display:block}
+
+/* Responsive */
+@media (max-width: 900px){
+  .container{grid-template-columns:1fr}
+  .sidebar{order:2;height:40vh}
+  .content{order:1;height:auto}
+  body{overflow:auto}
 }
 
-body {
-    font-family: 'Assistant', sans-serif;
-    background-color: #FDFBF7;
-    display: flex; /* Make body a flex container */
-    flex-direction: column; /* Stack children vertically */
-    overflow-x: hidden; /* Prevent horizontal scroll when panel shifts content */
+/* Modes: home (all trips) vs trip (focus one) */
+.container.home-mode{ grid-template-columns: 1fr; }
+.container.home-mode .content{ display: none; }
+.container.home-mode .sidebar{ display: block; width: 100%; max-width: 1100px; margin: 0 auto; }
+.container.home-mode .sidebar .section-title h2{ font-size: 1.6rem; }
+.container.home-mode #tripList.grid{ grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+
+.container.trip-mode{ grid-template-columns: 1fr; }
+.container.trip-mode .sidebar{ display: none; }
+.container.trip-mode .content{ display: block; }
+
+.brand-text{font-weight:700;letter-spacing:.5px}
+
+
+/* Centered login screen */
+.login-screen{display:grid;place-items:center;height:calc(100vh - 56px);padding:20px}
+.login-card{width:min(420px,92vw);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.login-card h1{font-size:1.6rem;margin:.2rem 0 .4rem}
+.login-card .input{width:100%}
+
+/* user badge */
+#userBadge{padding:6px 10px;border:1px solid var(--border);border-radius:999px}
+
+
+/* === Budget Bar === */
+.budget-bar{
+  display:flex; align-items:center; gap:16px;
+  border:1px solid var(--border); border-radius:22px; padding:12px 14px; background:var(--card);
 }
-.table-cell {
-    padding: 12px 16px;
-    text-align: right;
-    border-bottom: 1px solid #EAE2D9;
-    vertical-align: middle;
-}
-/* Remove default border from inner table cells for cleaner look */
-.collapsible-content table .table-cell {
-    border-bottom: none;
-}
-.collapsible-content table tbody tr:last-child .table-cell {
-    border-bottom: 1px solid #EAE2D9; /* Add border to last row of inner table */
+.budget-bar .bar-actions{display:flex; gap:10px}
+.budget-bar .btn.subtle{border:1px solid var(--border); background:transparent; border-radius:12px; padding:6px 12px}
+.budget-bar .bar-cols{display:flex; gap:28px; margin-inline-start:auto}
+.budget-bar .col{display:flex; align-items:center; gap:8px; min-width:120px; justify-content:flex-start}
+.budget-bar .lbl{color:var(--muted); font-size:14px}
+.budget-bar .val{font-size:16px}
+.budget-bar .val.bold{font-weight:700}
+.budget-bar .val.neg{color:var(--danger)}
+.budget-bar .badge{border:1px solid var(--border); border-radius:12px; padding:6px 12px; background:var(--card)}
+
+/* Updated "Meta" tab design */
+#view-meta .card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
 }
 
-/* Specific styling for table headers and cells to control width and alignment */
-.table-container th {
-    text-align: center; /* Center align table headers by default */
+#view-meta .card .row.dest-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
 }
-
-/* Adjusting column widths for better fit to ensure "פעולות" column is visible */
-/* Apply table-layout: fixed to the table to ensure column widths are respected */
-.table-container table {
-    table-layout: fixed; /* Ensures column widths are honored */
-    width: 100%; /* Make sure table takes full width */
-}
-
-/* Updated column widths for better mobile visibility */
-.table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-    width: 55%; /* Adjusted for more space */
-    text-align: right; /* Align report description to the right */
-    /* Removed overflow: hidden, text-overflow: ellipsis, white-space: nowrap to allow text to wrap */
-}
-
-.table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-    width: 10%; /* Kept compact for time */
-    min-width: 4rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align time */
-}
-
-.table-container th:nth-child(3), .table-container td:nth-child(3) { /* שם המדווח */
-    width: 15%; /* Reduced width */
-    min-width: 6rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align reporter */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.table-container th:nth-child(4), .table-container td:nth-child(4) { /* שיוך יומן */
-    width: 10%; /* Kept as requested */
-    min-width: 4rem; /* Adjusted for better legibility */
-    text-align: center; /* Center align log type */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-    width: 10%; /* Kept as requested */
-    min-width: 4.5rem; /* Minimum width for actions button */
-    text-align: center; /* Center align actions */
-}
-
-.form-input, .form-select, .form-textarea {
-    border-color: #DCD5CC;
-    transition: all 0.3s ease;
-    /* Ensure a sensible default min-height for textarea */
-    min-height: calc(1.5em * 3 + 1rem); /* Roughly 3 lines height + padding for default rows="3" */
-    overflow-y: auto; /* Changed to auto to allow pasted content with newlines to be displayed and scrolled if needed */
-    border-radius: 0.5rem; /* rounded-lg equivalent for default form inputs */
-}
-.form-input:focus, .form-select:focus, .form-textarea:focus {
-    border-color: #B8A692;
-    box-shadow: 0 0 0 2px rgba(184, 166, 146, 0.2);
-    outline: none;
-}
-.btn-primary {
-    background-color: #8C7A6B;
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
-}
-.btn-primary:hover {
-    background-color: #736357;
-}
-.btn-secondary {
-    background-color: #EAE2D9;
-    color: #6D5F53;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem; /* rounded-lg equivalent */
-}
-.btn-secondary:hover {
-    background-color: #DCD5CC;
-}
-/* Refined edit-mode styling for textarea: ensures a minimum height and allows manual resize */
-.form-textarea.edit-mode-fixed-height {
-    min-height: calc(1.5em * 5 + 1rem); /* Ensure a minimum height for edit mode, matching rows="5" */
-    resize: vertical; /* Allow manual vertical resize */
-    /* REMOVED height: auto !important; to prevent conflict with JS dynamic sizing */
-}
-
-/* Clock specific styles */
-.clock-container {
-    background-color: #FFF;
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
-    padding: 0.5rem 0.75rem; /* Reduced padding */
-    border: 1px solid #EAE2D9; /* ring-1 ring-[#EAE2D9] */
-    margin-top: 1rem; /* Adjusted margin-top */
-    text-align: center;
-    display: flex; /* Use flexbox for vertical alignment */
-    flex-direction: column; /* Stack children vertically */
-    justify-content: center; /* Center content vertically */
-    align-items: center; /* Center content horizontally */
-}
-.clock-display {
-    font-size: 2.5rem; /* text-4xl */
-    font-weight: 700; /* font-bold */
-    color: #6D5F53;
-    /* margin-bottom: 0.25rem; */ /* Removed margin-bottom here as it's now in a flex row with buttons */
-}
-.clock-label {
-    font-size: 1.25rem; /* text-xl */
-    font-weight: 600; /* font-semibold */
-    color: #6D5F53;
-    margin-bottom: 0.125rem; /* Reduced margin-bottom */
-}
-.clock-button {
-    background-color: #8C7A6B;
-    color: #FFFFFF;
-    font-weight: 700; /* font-bold */
-    padding: 0.4rem 0.8rem; /* Adjusted padding */
-    border-radius: 0.5rem;
-    transition: background-color 0.3s ease;
-}
-.clock-button:hover {
-    background-color: #736357;
-}
-
-/* Blinking animation */
-@keyframes blinker {
-    50% { opacity: 0; }
-}
-.blinking-red {
-    color: #ef4444; /* red-500 */
-    animation: blinker 1s linear infinite;
-}
-
-/* Highlight for search results */
-.highlight {
-    background-color: yellow;
-    padding: 1px 2px;
-    border-radius: 3px;
-}
-
-/* Aligning form elements */
-.form-row-aligned {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem; /* Space between elements in column */
-    align-items: flex-start; /* Align labels/inputs to the start */
-}
-@media (min-width: 640px) { /* sm breakpoint */
-    .form-row-aligned {
-        flex-direction: row;
-        align-items: flex-end; /* Align to bottom for row layout */
-    }
-    .form-input-group {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end; /* Push content to bottom */
-    }
-    /* Adjust textarea height to match group of two selects */
-    .form-textarea-aligned {
-        height: 5.5rem; /* Approximate height of two selects + labels + margins */
-    }
-}
-
-/* --- New Styles for Mobile Responsiveness and Tasks Panel --- */
-
-/* Hide columns on mobile for better readability */
-@media (max-width: 639px) { /* Targets screens smaller than 640px */
-    .table-container th:nth-child(3), /* שם המדווח */
-    .table-container td:nth-child(3),
-    .table-container th:nth-child(4), /* שיוך יומן */
-    .table-container td:nth-child(4) {
-        display: none !important; /* Force hide these columns */
-        width: 0 !important; /* Explicitly set width to 0 */
-        padding: 0 !important; /* Remove padding */
-        border: none !important; /* Remove borders */
-    }
-
-    /* Adjust colspan for empty/loading states on mobile (3 visible columns: דיווח, שעה, פעולות) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        /* The colspan needs to be set by JS, so leave CSS out here */
-        /* It's already handled in script.js renderTable function */
-    }
-
-    /* Mobile specific column widths for the remaining visible columns */
-    .table-container th:nth-child(1), .table-container td:nth-child(1) { /* דיווח */
-        width: 65% !important; /* Increased for more content space on mobile, ensure it's not fixed by desktop rule */
-        text-align: right; /* Ensure alignment */
-        white-space: normal; /* Allow text to wrap */
-        word-break: break-word; /* Break long words if necessary */
-    }
-    .table-container th:nth-child(2), .table-container td:nth-child(2) { /* שעה */
-        width: 15% !important; /* Kept compact for time, slight increase */
-        text-align: center; /* Ensure alignment */
-    }
-    .table-container th:nth-child(5), .table-container td:nth-child(5) { /* פעולות */
-        width: 20% !important; /* Adjusted to ensure buttons fit */
-        text-align: center; /* Ensure alignment */
-    }
-    /* Ensure no wrapping in headers that would stretch rows too much */
-    .table-container th {
-        white-space: nowrap; /* Prevent headers from wrapping */
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    /* Adjust font size for actions on mobile if necessary to fit */
-    .table-cell button, .table-cell span {
-        font-size: 0.65rem; /* Even smaller font for buttons/spans in action column */
-        padding: 0.15rem 0.3rem; /* Adjust padding for smaller buttons */
-        min-width: unset; /* Remove min-width that might stretch */
-    }
-    /* Adjusting daily summary text alignment on mobile to prevent overflow */
-    .daily-summary {
-        display: block; /* Make it a block element to take its own line if needed */
-        font-size: 0.7rem; /* Slightly smaller font for summary */
-        text-align: right; /* Align right */
-        white-space: normal; /* Allow text to wrap if it's very long */
-        word-break: break-word; /* Break long words */
-        margin-top: 0.25rem; /* Add a small top margin */
-    }
-    /* Ensure the toggle button does not take up too much space and aligns well */
-    .toggle-day-btn {
-        flex-shrink: 0; /* Prevent it from shrinking */
-        align-self: flex-start; /* Align to the start of the td content */
-        margin-left: 0; /* Remove extra margin on mobile */
-        margin-right: 0.5rem; /* Add some space between button and text */
-        padding: 0.1rem; /* Smaller padding */
-    }
-    .date-group-header td {
-        display: flex; /* Use flexbox for the date header cell */
-        flex-wrap: wrap; /* Allow content to wrap */
-        align-items: center; /* Align items vertically */
-        justify-content: flex-start; /* Align to start (right for RTL) */
-    }
-    /* Make the date text part align correctly with the summary below it */
-    .date-group-header td > span:first-of-type { /* This targets the actual date string */
-        flex-grow: 1; /* Allow the date text to grow and take available space */
-        text-align: right;
-        margin-left: 0.5rem; /* Space before date text */
-    }
-    .date-group-header td .text-blue-600 { /* This is the toggle button */
-        order: 1; /* Place toggle button first (on the right in RTL) */
-    }
-    .date-group-header td .daily-summary {
-        order: 3; /* Place summary after date and toggle */
-        width: 100%; /* Take full width below the date */
-        text-align: right;
-    }
-}
-
-/* Ensure mobile-only cells are hidden on desktop */
-@media (min-width: 640px) {
-    /* Ensure these columns are visible on desktop */
-    .table-container th:nth-child(3), /* שם המדווח */
-    .table-container td:nth-child(3),
-    .table-container th:nth-child(4), /* שיוך יומן */
-    .table-container td:nth-child(4) {
-        display: table-cell !important;
-    }
-    /* Reset colspan for desktop (5 visible columns now: דיווח, שעה, מדווח, שיוך, פעולות) */
-    #reportTableBody #empty-state td,
-    #reportTableBody #loading-state td {
-        colspan: 5;
-    }
-    /* Ensure daily summary is hidden on desktop by default */
-    .daily-summary {
-        display: none;
-    }
+/* New style for the map button to match the destination input field */
+#view-meta .btn.map-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  height: 44px; /* Matches the height of the input field */
 }
 
 
-/* Tasks Panel Styling - Modified for Right side positioning and animation */
-.tasks-panel {
-    position: fixed;
-    right: 0; /* Aligned to the right edge */
-    left: auto; /* Ensure left is not set */
-    top: 0;
-    height: 100%;
-    width: 250px; /* Default width */
-    max-width: 90%; /* Max width on smaller screens */
-    background-color: #F8F5F1;
-    border-left: 1px solid #DCD5CC; /* Changed to left border */
-    border-right: none; /* Removed right border */
-    box-shadow: -2px 0 8px rgba(0,0,0,0.1); /* Adjusted shadow for right side */
-    transform: translateX(100%); /* Start off-screen to the right */
-    transition: transform 0.3s ease-out; /* Smooth transition */
-    z-index: 45; /* Below the button but above main content */
-    padding: 1rem; /* Adjusted padding */
+/* New layout for date, people, and trip types */
+#view-meta .date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  align-items: flex-end;
 }
-.tasks-panel.is-open {
-    transform: translateX(0); /* Slide in to be fully visible from the right */
+#view-meta .date-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-
-/* Main content shifting when tasks panel is open - Adjusted for Right side panel */
-#app-content.app-content-shifted {
-    transform: translateX(-250px); /* Push app-content to the left by panel's width */
-    transition: transform 0.3s ease-out; /* Add a transition to app-content for smooth movement */
+#view-meta .date-row label:has(#metaStart), #view-meta .date-row label:has(#metaEnd) {
+    grid-column: span 1;
+    width: 100%;
 }
-@media (min-width: 768px) { /* md breakpoint and up */
-    .tasks-panel {
-        width: 300px; /* Wider on desktop */
-    }
-    #app-content.app-content-shifted {
-        transform: translateX(-300px); /* Adjust shift for wider panel */
-    }
+#view-meta .date-row .people-input {
+  grid-column: 3 / 4;
 }
-
-
-.task-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem;
-    background-color: #FFFFFF;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    transition: background-color 0.2s ease;
+#view-meta .date-row .multi-types {
+  grid-column: 4 / 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.task-item:hover {
-    background-color: #EAE2D9;
+#view-meta .date-row .multi-types .lbl {
+  font-size: 1em;
 }
-.task-item.highlight-completed {
-    background-color: #DCD5CC; /* Gray background */
-    color: #6D5F53;
-    text-decoration: line-through; /* Strikethrough */
+#view-meta .date-row .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.task-item input[type="checkbox"] {
-    margin-right: 0.75rem; /* Space between checkbox and text */
-    min-width: 1.25rem; /* Ensure checkbox is not too small */
-    min-height: 1.25rem;
-    cursor: pointer;
+#view-meta .date-row .chips .chip {
+  padding: 6px 10px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+#view-meta .date-row .chips .chip.active {
+  background: var(--brand);
+  color: var(--ink);
 }
 
-/* Reporters Modal Styling */
-#reportersModal .reporters-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
+/* Budget block */
+#view-meta .budget-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
 }
-#reportersModal .reporters-list-item:hover {
-    background-color: #EAE2D9;
+#view-meta .budget-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
 }
-#reportersModal .reporters-list-item button {
-    background-color: #ef4444; /* red-500 */
-    color: white;
-    padding: 0.25rem 0.6rem;
-    border-radius: 0.375rem; /* rounded-md */
-    font-size: 0.8rem;
-    font-weight: 600;
-    transition: background-color 0.3s ease;
+#view-meta .budget-actions-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
 }
-.reporters-list-item button:hover {
-    background-color: #dc2626; 
-}
-
-/* Custom Alert Modal */
-#customAlert > div {
-    border-radius: 0.75rem; /* rounded-xl */
+#view-meta .rates-line {
+  display: none; /* Hide exchange rates section */
 }
 
-/* Header Buttons Styling (including new Tasks button) */
-.btn-tasks {
-    background-color: #ef4444; /* red-500 */
-    color: #FFFFFF;
-    transition: background-color 0.3s ease;
-    border-radius: 0.5rem;
-    font-weight: 700;
-    padding: 0.5rem 1rem; /* Adjust padding for regular buttons */
-}
-.btn-tasks:hover {
-    background-color: #dc2626; 
-}
-.btn-tasks.completed-tasks {
-    background-color: #22c55e; /* green-500 */
-}
-.btn-tasks.completed-tasks:hover {
-    background-color: #16a34a; 
+#view-meta .row:has(#btnSaveMeta) {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
-/* Header Menu Styling */
-#headerMenu {
-    top: 100%; /* Position below the toggle button */
-    right: 0; /* Align to the right of its parent (flex item) */
-    min-width: 150px; /* Adjust as needed */
+/* === shrink budget block height by ~20% === */
+#view-meta .budget-block{ padding:9px; gap:6px; }
+#view-meta .budget-row{ gap:6px; }
+#view-meta .budget-actions-row{ gap:8px; }
+#view-meta .budget-block .input{ padding:8px 10px; }
+
+
+/* === Budget row: shrink inputs to 50% width and keep in one line === */
+#view-meta .budget-row{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* always one row, 3 columns */
+  gap: 10px;
+  align-items: end;
 }
-#headerMenu.open {
-    display: block;
-    /* Shifts the menu 50% of its own width to the right from its current positioned location */
-    transform: scale(1) translateX(50%); 
-    opacity: 1;
+#view-meta .budget-row .input{
+  width: 50% !important; /* half the label width */
+}
+#view-meta .budget-row label{
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center the half-width inputs */
 }
 
-/* Styling for the dynamic tasks buttons container - Adjusted for Right side positioning */
-#taskButtonsContainer {
-    position: fixed;
-    right: 0; /* Aligned to the right edge */
-    left: auto; /* Ensure left is not set */
-    top: 50%; 
-    transform: translateY(-50%); 
-    z-index: 50; /* Higher z-index to always be on top */
-    display: flex;
-    flex-direction: column; 
-    gap: 0.5rem; 
+
+/* === Budget actions in one line, right-aligned, matching input style === */
+#view-meta .budget-actions-row{
+  display: flex;
+  justify-content: flex-end;   /* push to the right */
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+#view-meta .budget-actions-row .btn{
+  padding: 10px 14px;          /* similar to inputs */
+  border-radius: 12px;         /* rounded like inputs */
+  line-height: 1.1;
+  height: 40px;                /* consistent height */
 }
 
-/* Styling for individual task type buttons - Adjusted for Right side positioning */
-.task-type-button {
-    writing-mode: vertical-rl; 
-    text-orientation: mixed; 
-    padding: 0.75rem 0.5rem; 
-    border-top-left-radius: 0.5rem; /* Changed to left radius */
-    border-bottom-left-radius: 0.5rem; /* Changed to left radius */
-    border-top-right-radius: 0; /* Ensured right radius is 0 */
-    border-bottom-right-radius: 0; /* Ensured right radius is 0 */
-    font-weight: 700;
-    color: #6D5F53; /* Default text color for neutral state */
-    transition: background-color 0.3s ease;
-    border: none; 
-    cursor: pointer;
-    text-align: center;
-    background-color: #EAE2D9; /* Default gray/neutral color for task buttons */
+
+/* === Budget layout: 3 currencies on left, actions on right, same row === */
+#view-meta .budget-block{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(100px, 10%)) 1fr repeat(2, minmax(110px, 12%));
+  align-items: end;
+  gap: 4px; /* ~10% of typical 40px wider gaps */
+  padding: 9px; /* keep the compact padding we set earlier */
+}
+#view-meta .budget-row,
+#view-meta .budget-actions-row{
+  display: contents; /* flatten children into grid */
+}
+#view-meta .budget-row label{
+  width: 100%;
+  max-width: 140px;   /* keep the inputs compact */
+}
+#view-meta .budget-row .input{
+  width: 100% !important;
+  padding: 8px 10px;
+}
+#view-meta .budget-actions-row .btn{
+  width: auto;
+  min-width: 120px;
+  height: 40px;
+  padding: 8px 12px;
+  text-align: center;
 }
 
-/* Task button states based on completion and reports */
-.task-type-button.tasks-incomplete-with-reports { /* Red when tasks are not completed but there are reports for today */
-    background-color: #ef4444; 
-    color: #FFFFFF; /* Ensure text is white on red */
+/* Fallback for very narrow screens: stack nicely */
+@media (max-width: 720px){
+  #view-meta .budget-block{
+    grid-template-columns: 1fr 1fr;
+  }
+  #view-meta .budget-row,
+  #view-meta .budget-actions-row{ display: contents; }
 }
-.task-type-button.tasks-incomplete-with-reports:hover {
-    background-color: #dc2626; 
+
+
+/* === Meta: emphasize 'יעד' label like 'תקציב' and unify field heights === */
+#view-meta .dest-row .dest-col{
+  font-weight: 700;
+  font-size: 1.5rem; /* similar to h3 heading size */
+  line-height: 1.2;
 }
-.task-type-button.all-tasks-completed { /* Green when all tasks are completed for today */
-    background-color: #22c55e; 
-    color: #FFFFFF; /* Ensure text is white on green */
+/* Remove 'בדוק במפה' button (no meaning) */
+#btnVerifyOnMap{ display:none !important; }
+/* Unify heights for all inputs in meta section */
+#view-meta .input, 
+#view-meta input[type="date"]{
+  height: 44px;
+  padding: 10px 12px;
 }
-.task-type-button.all-tasks-completed:hover {
-    background-color: #16a34a; 
+/* Keep chips row aligned to same baseline */
+#view-meta .chips .chip{ height: 36px; display:flex; align-items:center; }
+
+
+/* === Overview tab: stack cards vertically === */
+#view-overview .cards{
+  grid-template-columns: 1fr !important;
+  gap: 16px;
+}
+
+.rate-note{font-size:12px;opacity:.7;margin-top:2px;direction:rtl}
+
+.rate-line{font-size:12px;margin-top:6px;opacity:.75;direction:rtl}
+
+mark {
+  background-color: #ffd166;
+  color: var(--ink);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.match-source {
+  font-weight: 700;
+}
+/* Grid mode */
+.grid .trip-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.grid .trip-card strong {
+  font-size: 1.1rem;
+}
+
+.grid .trip-card .muted {
+  margin-top: 0;
+}
+
+.grid .trip-card .pill {
+  width: 60%;
+  justify-self: start;
+}
+.trip-card .pill {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: .85rem;
+}
+.grid .trip-card .menu-btn {
+  position: absolute;
+  top: 50%;
+  left: 10px; /* מיקום יחסי לכרטיס */
+  transform: translateY(-50%) rotate(90deg); /* יישור למרכז אנכי וסיבוב */
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+/* List mode */
+.list .trip-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--card);
+}
+
+.list .trip-row .pill {
+  grid-column: 1;
+  width: fit-content;
+  margin: 0;
+  justify-self: start;
+}
+
+.list .trip-row .menu-btn {
+  grid-column: 2;
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+  justify-self: end;
+}
+
+.list-actions .btn.active {
+  border-color: var(--brand);
+  background: color-mix(in oklab, var(--brand) 20%, transparent);
+}
+.trip-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background-color: var(--card);
+  position: relative; /* הוסף מיקום יחסי כדי למקם את הכפתור */
+}
+
+.trip-card strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.trip-card .muted {
+  font-size: 1rem;
+  color: var(--muted);
+}
+.trip-card > div:first-of-type {
+    margin-bottom: 8px;
+}
+
+/* New style for the pill to be on the same line as the menu button */
+.trip-card .footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trip-card .menu-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px; /* מיקום בצד שמאל */
+  transform: none;
+  border: none;
+  background: transparent;
+  padding: 6px;
+}
+.trip-card .menu-btn svg {
+  transform: rotate(90deg); /* סיבוב כדי שהנקודות יהיו אנכיות */
+}
+
+/* New: expense and journal location buttons */
+.location-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.location-row label{
+    flex-grow:1;
+}
+.location-row .input{
+    width:100%;
+}
+.location-row .location-btn{
+    flex-shrink:0;
+    height:44px;
+    padding:10px 12px;
+    align-self:stretch;
+    line-height:22px;
+    font-size:14px;
+}
+
+/* New styling for inline links */
+.external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.external-link svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--brand); /* Set icon color to brand color */
+}
+
+/* Ensure the link doesn't interfere with the row click */
+td a.external-link {
+  pointer-events: all;
 }

@@ -1,255 +1,363 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>יומן חפ"ק - לפיד</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Assistant', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    
-    <link rel="stylesheet" href="style.css">
-    
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FLYMILY — מנהל נסיעות</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <link rel="stylesheet" href="./style.css" />
+
+  <link rel="icon" type="image/png" href="./flymily-logo.png">
+
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/advancedFormat.js"></script>
 </head>
-<body class="bg-[#FDFBF7] text-[#4A443E] flex flex-col h-screen overflow-hidden">
+<body data-theme="light">
+  <div class="app">
+    <header>
+      <div class="brand" style="display:flex;align-items:center;gap:8px"><img src="./flymily-logo.png" alt="FLYMILY" style="height:28px;vertical-align:middle"> <span class="brand-text">FLYMILY</span></div>
+      <div class="spacer"></div>
+      <span id="userBadge" class="muted" style="display:none"></span>
+      <button id="btnAllTrips" class="btn" style="display:none">כל הנסיעות</button>
+      <button id="btnTheme" class="btn">מצב כהה/בהיר</button>
+      <button id="btnLogin" class="btn primary">התחברות / הרשמה</button>
+      <button id="btnLogout" class="btn" style="display:none">התנתקות</button>
+    </header>
+
     
-    <!-- Login Page -->
-    <div id="login-page" class="absolute inset-0 bg-[#FDFBF7] flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-xl shadow-lg ring-1 ring-[#EAE2D9] w-full max-w-sm text-center">
-            <h2 class="text-2xl font-bold text-[#6D5F53] mb-6">התחברות ליומן חפ"ק</h2>
-            <div class="mb-4">
-                <label for="loginEmail" class="sr-only">אימייל</label>
-                <input type="email" id="loginEmail" placeholder="אימייל" class="form-input w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" value="user@example.com">
-            </div>
-            <div class="mb-6">
-                <label for="loginPassword" class="sr-only">סיסמה</label>
-                <input type="password" id="loginPassword" placeholder="סיסמה" class="form-input w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" value="123456">
-            </div>
-            <button id="loginBtn" class="btn-primary w-full py-3 rounded-lg text-lg font-semibold shadow">התחבר</button>
-            <p id="loginErrorMessage" class="text-red-500 text-sm mt-4 h-5"></p>
-        </div>
+<div id="loginScreen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <img src="./flymily-logo.png" alt="FLYMILY" style="height:96px;margin-bottom:12px;opacity:.95">
+    <h1>כניסה ל‑FLYMILY</h1>
+    <p class="muted" style="margin-top:-6px">נהל ותכנן טיולים – בעברית וב־RTL</p>
+    <label>אימייל<input id="lsEmail" type="email" class="input" placeholder="name@example.com"/></label>
+    <label>סיסמה<input id="lsPass" type="password" class="input" placeholder="••••••••"/></label>
+    <div class="row" style="margin-top:8px">
+      <button id="lsSignIn" class="btn primary">כניסה</button>
+      <button id="lsSignUp" class="btn">הרשמה</button>
+      <button id="lsReset" class="btn">איפוס סיסמה</button>
     </div>
-
-    <!-- Tasks Panel (Right Side) -->
-    <div id="tasksPanel" class="tasks-panel fixed right-0 top-0 h-full bg-[#F8F5F1] shadow-xl p-4 z-40 transition-transform duration-300 ease-out transform translate-x-full overflow-y-auto w-64 md:w-80 hidden">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-[#6D5F53]">משימות עבור <span id="tasksLogTypeDisplay"></span></h3>
-            <button id="closeTasksPanelBtn" class="text-xl font-bold text-[#6D5F53] hover:text-[#4A443E]">&times;</button>
+    <p id="lsError" class="muted" style="color:var(--danger);min-height:1.5em"></p>
+  </div>
+</div>
+<div class="container home-mode">
+      <aside class="sidebar" id="sidebar">
+        <div class="section-title">
+          <h2 style="margin:0">הנסיעות שלי</h2>
+          <div class="spacer"></div>
+      <span id="userBadge" class="muted" style="display:none"></span>
+          <button id="btnNewTrip" class="btn primary">+ נסיעה חדשה</button>
         </div>
-        <div id="tasksList" class="space-y-3">
-            <!-- Tasks will be rendered here -->
+        <div class="list-actions">
+          <input id="searchTrips" class="input" placeholder="חפש נסיעה / מילה" />
+          <button id="btnSortTrips" class="btn">מיין תאריך יציאה</button>
         </div>
-        <p id="allTasksCompletedMessage" class="text-green-600 text-center mt-6 font-semibold hidden">כל המשימות הושלמו!</p>
-    </div>
+        <div class="list-actions">
+          <button id="btnViewGrid" class="btn active">גלריה</button>
+          <button id="btnViewList" class="btn">רשימה</button>
+        </div>
+        <div id="tripList" class="grid" aria-live="polite"></div>
+      </aside>
 
-    <!-- Main Application Content -->
-    <div id="app-content" class="w-full h-full p-2 sm:p-6 md:p-8 flex-grow overflow-y-auto transition-transform duration-300 ease-out"> 
+      <main class="content" id="main">
+        <nav class="tabs" id="tabs" style="display:none">
+          <button data-tab="overview" class="active">הצג הכל</button>
+          <button data-tab="meta">נתוני נסיעה</button>
+          <button data-tab="expenses">הוצאות</button>
+          <button data-tab="journal">יומן יומי</button>
+          <button data-tab="map">מפה</button>
+          <button data-tab="share">ייבוא / ייצוא / שיתוף</button>
+        </nav>
 
-        <header class="text-center mb-6 flex justify-between items-center flex-wrap gap-2">
-            <h1 class="text-3xl md:text-4xl font-bold text-[#6D5F53] flex-grow">יומן חפ"ק - לפיד</h1>
-            <div class="flex gap-2 items-center relative">
-                
-                <!-- Task Buttons Container (Always visible on the right) -->
-                <div id="taskButtonsContainer" class="fixed right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30">
-                    <!-- Task buttons will be injected here by JavaScript -->
-                </div>
-
-                <!-- Hamburger Menu Button -->
-                <button id="menuToggleBtn" class="btn-secondary font-bold py-1.5 px-3 rounded-lg shadow text-xl"><i class="fas fa-bars"></i></button>
-                
-                <!-- Header Menu (Dropdown) -->
-                <div id="headerMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden origin-top-right transform scale-95 opacity-0 transition-all duration-200 ease-out"
-                     role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
-                    <button id="searchLogBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">חיפוש ביומן</button>
-                    <input type="text" id="searchInput" class="form-input p-1.5 border rounded-lg text-sm w-full px-4 py-2 mt-1 hidden" placeholder="חפש...">
-                    <button id="exportExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייצא לאקסל</button>
-                    <button id="importExcelBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ייבוא מאקסל</button>
-                    <button id="editReportersBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ערוך מדווחים</button>
-                    <!-- Updated: Added "הוסף שיוך" inside the Task Settings menu -->
-                    <button id="manageTaskSettingsBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">ניהול הגדרות משימות</button>
-                    <button id="logoutBtn" class="block w-full text-right px-4 py-2 text-sm text-[#4A443E] hover:bg-[#F8F5F1] hover:text-[#6D5F53] rounded-md" role="menuitem" tabindex="-1">התנתק</button>
-                </div>
+        <section id="view-overview" class="tabview" hidden>
+          <h2>סקירה כללית</h2>
+          <div class="cards">
+            <div class="card">
+              <h3>נתוני נסיעה</h3>
+              <div id="metaSummary" class="muted"></div>
             </div>
-        </header>
-
-        <!-- Clock Section -->
-        <section class="flex flex-col md:flex-row gap-6 mb-6">
-            
-            <div class="clock-container flex-1">
-                <div class="clock-label">שעה נוכחית</div>
-                <div id="currentTimeDisplay" class="clock-display">00:00:00</div>
+            <div class="card">
+              <h3>הוצאות (אחרונות)</h3>
+              <table>
+                <thead><tr><th>תיאור</th><th>קטגוריה</th><th>סכום</th><th>תאריך</th></tr></thead>
+                <tbody id="tblRecentExpenses"></tbody>
+              </table>
             </div>
-
-            <!-- Assessment Clock -->
-            <div class="clock-container flex-1">
-                <div class="clock-label">הערכת מצב</div>
-                <div class="flex items-center justify-center gap-4"> 
-                    <button id="assessmentTimeMinusBtn" class="clock-button">-</button> 
-                    <div id="assessmentTimeDisplay" class="clock-display">00:00</div> 
-                    <button id="assessmentTimePlusBtn" class="clock-button">+</button> 
-                </div>
+            <div class="card">
+              <h3>יומן יומי (אחרונים)</h3>
+              <table>
+                <thead><tr><th>תאריך</th><th>מקום</th><th>תיאור</th></tr></thead>
+                <tbody id="tblRecentJournal"></tbody>
+  ...
+</table>
             </div>
+            <div class="card">
+              <h3>מיקומים אחרונים</h3>
+              <div id="miniMap" style="height:280px" class="leaflet-container"></div>
+            </div>
+          </div>
         </section>
 
-        <main class="bg-white rounded-xl shadow-lg p-6 ring-1 ring-[#EAE2D9]">
-            <div class="controls-section mb-6 pb-6 border-b border-[#EAE2D9]">
-                
-                <div class="max-w-full mx-auto mb-6 p-4 bg-[#F8F5F1] rounded-lg shadow-inner">
-                    <div class="flex flex-col sm:flex-row items-end gap-4"> 
-                        <div class="flex-grow-[5] w-full sm:w-auto min-w-0 form-input-group">
-                            <label for="generalTextInput" class="block mb-1 text-sm font-semibold text-[#6D5F53]">תיאור דיווח:</label>
-                            <textarea id="generalTextInput" class="form-textarea w-full p-2 border rounded-md form-textarea-aligned" rows="3" placeholder="פרטי דיווח קצרים..."></textarea>
-                        </div>
-                        
-                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterReporter" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">מדווח:</label>
-                            <select id="filterReporter" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
-                                <!-- Reporters will be dynamically populated here -->
-                            </select>
-                        </div>
-                        
-                        <div class="flex-shrink-0 w-full sm:w-auto form-input-group"> <label for="filterLogType" class="block mb-1 text-sm font-semibold text-[#8C7A6B]">שיוך:</label>
-                            <select id="filterLogType" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm">
-                                <option value="">בחר שיוך</option>
-                                <option value="שגרה">שגרה</option>
-                                <option value="בטחוני">בטחוני</option>
-                                <option value="שריפה">שריפה</option>
-                                <option value="נעדר">נעדר</option>
-                            </select>
-                        </div>
-                        
-                        <div id="dateTimeInputsWrapper" class="flex-shrink-0 w-full sm:w-48 hidden">
-                            <div class="flex flex-col gap-2">
-                                <div>
-                                    <label for="newDate" class="block mb-1 text-sm font-semibold text-[#6D5F53]">תאריך:</label>
-                                    <input type="date" id="newDate" class="form-input w-full p-2 border rounded-md">
-                                </div>
-                                <div>
-                                    <label for="newTime" class="block mb-1 text-sm font-semibold text-[#6D5F53]">שעה:</label>
-                                    <input type="text" id="newTime" class="form-input w-full p-2 border rounded-md" placeholder="HH:MM" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex-shrink-0 w-full sm:w-auto flex flex-row sm:flex-col items-end gap-2"> 
-                            <button id="mainActionBtn" class="btn-primary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto">הזן</button>
-                            <button id="cancelEditBtn" class="btn-secondary font-bold py-2 px-6 rounded-lg shadow w-full sm:w-auto hidden">ביטול</button>
-                        </div>
-                    </div>
-                    <div id="inputErrorMessage" class="text-red-500 text-center mt-4 h-5"></div>
-                </div>
-
-            </div>
-
-            <!-- Reports Table -->
-            <div class="table-container overflow-x-auto">
-                <div class="flex justify-start gap-4 mb-4">
-                    <button id="expandAllBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">פתח הכל</button>
-                    <button id="collapseAllBtn" class="btn-secondary font-bold py-1.5 px-4 rounded-lg shadow text-sm">צמצם הכל</button>
-                </div>
-                
-                <table class="w-full min-w-full text-sm">
-                    <thead>
-                        <tr>
-                            <th class="table-cell font-bold text-[#6D5F53]">דיווח</th>
-                            <th class="table-cell font-bold text-[#6D5F53] w-24 min-w-[6rem] text-center">שעה</th>
-                            <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only w-32 min-w-[8rem] text-center">שם המדווח</th>
-                            <th class="table-cell font-bold text-[#6D5F53] table-cell-desktop-only w-24 min-w-[6rem] text-center">שיוך יומן</th>
-                            <th class="table-cell font-bold text-[#6D5F53] w-24 min-w-[6rem] text-center">פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportTableBody">
-                        <tr id="empty-state">
-                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">לא נוספו דיווחים עדיין.</td>
-                        </tr>
-                        <tr id="loading-state" class="hidden">
-                            <td colspan="5" class="table-cell text-center text-gray-500 py-8">טוען דיווחים...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </main>
-
+        <section id="view-meta" class="tabview" hidden>
+  <h2>נתוני נסיעה</h2>
+  <div class="card meta-single">
+    <div class="row dest-row">
+      <label class="dest-col">יעד
+        <input id="metaDestination" class="input"/>
+      </label>
+      <button id="btnVerifyOnMap" class="btn map-btn">בדוק במפה</button>
     </div>
-
-    <!-- Reporters Management Modal -->
-    <div id="reportersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
-            <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול מדווחים</h3>
-            
-            <div class="mb-4">
-                <label for="newReporterName" class="block mb-2 text-sm font-semibold text-[#6D5F53]">שם מדווח חדש:</label>
-                <input type="text" id="newReporterName" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692]" placeholder="הזן שם">
-            </div>
-            <button id="addReporterBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mb-6">הוסף מדווח</button>
-
-            <div class="mb-4">
-                <h4 class="text-lg font-semibold text-[#6D5F53] mb-3">מדווחים קיימים:</h4>
-                <ul id="reportersList" class="border border-[#EAE2D9] rounded-lg bg-[#F8F5F1] max-h-48 overflow-y-auto divide-y divide-[#DCD5CC]">
-                    <!-- Reporters list will be rendered here -->
-                </ul>
-            </div>
-            
-            <button id="closeReportersModalBtn" class="btn-secondary py-2 px-4 rounded-lg font-semibold shadow">סגור</button>
-            <p id="reporterErrorMessage" class="text-red-500 text-sm mt-4 h-5"></p>
+    <div class="row date-row">
+      <label>תאריך התחלה <input type="date" id="metaStart" class="input"></label>
+      <label>תאריך סיום <input type="date" id="metaEnd" class="input"></label>
+      <label class="people-input">משתתפים (מופרדים בפסיק)<input id="metaPeople" class="input"/></label>
+      <div class="multi-types">
+        <div class="lbl">סוגי טיול</div>
+        <div class="chips">
+          <button class="chip metaType" data-value="עירוני">עירוני</button>
+          <button class="chip metaType" data-value="בטן גב">בטן גב</button>
+          <button class="chip metaType" data-value="סקי">סקי</button>
+          <button class="chip metaType" data-value="טרק">טרק</button>
+          <button class="chip metaType" data-value="אחר">אחר</button>
         </div>
+      </div>
     </div>
+    <div class="budget-block">
+      <h3>תקציב</h3>
+      <div class="row budget-row">
+        <label>USD <input id="bUSD" type="text" class="input money"></label>
+        <label>EUR <input id="bEUR" type="text" class="input money"></label>
+        <label>ILS <input id="bILS" type="text" class="input money"></label>
+      </div>
+      <div class="row budget-actions-row">
+        <button id="btnBudgetEdit" class="btn">קבע תקציב</button>
+        <button id="btnSaveMeta" class="btn primary">שמור</button>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- Task Settings Modal -->
-    <div id="taskSettingsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-right">
-            <h3 class="text-2xl font-bold text-[#6D5F53] mb-6">ניהול הגדרות משימות</h3>
-            <p class="text-gray-700 mb-4">
-                כאן תוכל להגדיר את רשימות המשימות עבור כל שיוך יומן.
-            </p>
-            <div class="mb-4">
-                <label for="selectTaskTypeForSettings" class="block mb-2 text-sm font-semibold text-[#6D5F53]">בחר שיוך:</label>
-                <select id="selectTaskTypeForSettings" class="form-select w-full p-2.5 bg-white border rounded-lg shadow-sm mb-4">
-                    <option value="">בחר שיוך</option>
-                    <option value="הוסף שיוך">הוסף שיוך</option> <!-- New option for adding a new log type -->
-                    <option value="שגרה">שגרה</option>
-                    <option value="בטחוני">בטחוני</option>
-                    <option value="שריפה">שריפה</option>
-                    <option value="נעדר">נעדר</option>
-                </select>
-                <!-- New input for adding a new log type name -->
-                <input type="text" id="newTaskTypeInput" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692] mt-2 hidden" placeholder="הזן שם שיוך חדש">
-                <button id="addNewTaskTypeBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mt-2 hidden">הוסף שיוך חדש</button>
+        <section id="view-expenses" class="tabview" hidden>
+          <div class="section-title"><h2 style="margin:0">ניהול תקציב</h2></div>
+          <div class="cards">
+            <div class="card" id="expenseSummary"></div>
+          </div>
+          <div class="list-actions">
+            <button id="btnAddExpense" class="btn primary">הוסף הוצאה</button>
+            <button id="btnSortExpenses" class="btn">מיין</button>
+          </div>
+          <div class="card">
+            <table>
+              <thead><tr><th></th><th>תיאור</th><th>קטגוריה</th><th>סכום</th><th>מטבע</th><th>תאריך</th></tr></thead>
+              <tbody id="tblExpenses"></tbody>
+            </table>
+          </div>
+        </section>
 
-                <div id="currentTasksForSettings" class="border border-[#EAE2D9] rounded-lg bg-[#F8F5F1] p-3 max-h-48 overflow-y-auto text-sm mt-4">
-                    <p class="text-gray-500 text-center">בחר שיוך כדי לראות משימות.</p>
-                </div>
-                <input type="text" id="newTaskItemInput" class="form-input w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#B8A692] mt-4 hidden" placeholder="הוסף משימה חדשה">
-                <button id="addTaskItemBtn" class="btn-primary py-2 px-4 rounded-lg font-semibold shadow mt-2 hidden">הוסף משימה</button>
+        <section id="view-journal" class="tabview" hidden>
+          <div class="list-actions">
+            <button id="btnAddJournal" class="btn primary">הוסף רישום</button>
+            <button id="btnSortJournal" class="btn">מיין</button>
+          </div>
+          <div class="card">
+            <table>
+              <thead><tr><th></th><th>תאריך</th><th>מקום</th><th>תיאור</th></tr></thead>
+              <tbody id="tblJournal"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="view-map" class="tabview" hidden>
+          <div style="position:relative">
+            <div class="map-toolbar">
+              <button id="btnToggleSpent" class="btn">איפה ביזבזתי</button>
+              <button id="btnToggleVisited" class="btn">איפה טיילתי</button>
             </div>
-            
-            <button id="closeTaskSettingsModalBtn" class="btn-secondary py-2 px-4 rounded-lg font-semibold shadow">סגור</button>
-        </div>
-    </div>
+            <div id="bigMap" class="leaflet-container"></div>
+          </div>
+        </section>
 
-    <!-- Custom Alert Modal -->
-    <div id="customAlert" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-6 rounded-lg shadow-lg text-center">
-            <p id="customAlertMessage" class="text-lg font-semibold text-[#6D5F53] mb-4"></p>
-            <button id="customAlertCloseBtn" class="btn-primary py-2 px-4 rounded-lg">אישור</button>
-        </div>
-    </div>
+        <section id="view-share" class="tabview" hidden>
+          <h2>ייבוא / ייצוא / שיתוף</h2>
+          <div class="cards">
+            <div class="card">
+              <h3>ייבוא JSON</h3>
+              <input type="file" id="importFile" accept="application/json" class="input"/>
+              <div class="row"><button id="btnImport" class="btn primary">ייבא</button></div>
+            </div>
+            <div class="card">
+              <h3>ייצוא</h3>
+              <div class="row">
+                <select id="exportWithExpenses" class="input"><option value="yes">עם הוצאות</option><option value="no">בלי הוצאות</option></select>
+              </div>
+              <div class="row">
+                <button id="btnExportPDF" class="btn">PDF</button>
+                <button id="btnExportExcel" class="btn">Excel</button>
+                <button id="btnExportWord" class="btn">Word</button>
+                <button id="btnExportGPX" class="btn">GPX</button>
+              </div>
+            </div>
+            <div class="card">
+              <h3>שיתוף</h3>
+              <div class="row">
+                <button id="btnEnableShare" class="btn">הפעל שיתוף</button>
+                <button id="btnDisableShare" class="btn danger">בטל שיתוף</button>
+              </div>
+              <div class="row">
+                <input id="shareLink" class="input" readonly placeholder="לחץ על 'הפעל שיתוף'" />
+                <button id="btnCopyShare" class="btn">העתק קישור</button>
+              </div>
+              <p class="muted">קישור שיתוף יציג <strong>יומן יומי</strong> ו<strong>מפה</strong> בלבד, עם סימוני "איפה טיילתי" בלבד.</p>
+            </div>
+          </div>
+        </section>
 
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="script.js"></script>
+        <section id="view-welcome" class="tabview">
+          <div class="trip-card">
+            <img src="./flymily-logo.png" alt="FLYMILY" style="height:42px;opacity:.9"><h2>ברוכים הבאים ל-FLYMILY</h2>
+            <p class="muted">התחברו כדי לנהל, לעקוב, ולשתף טיולים — בעברית ובכיווניות RTL.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="authModal" class="modal">
+    <header style="display:flex;align-items:center;gap:8px"><img src="./flymily-logo.png" alt="FLYMILY" style="height:22px"><strong>התחברות / הרשמה</strong></header>
+    <div class="body">
+      <label>אימייל<input id="authEmail" type="email" class="input" placeholder="name@example.com"/></label>
+      <label>סיסמה<input id="authPass" type="password" class="input" placeholder="••••••••"/></label>
+      <p id="authError" class="muted" style="color:var(--danger);"></p>
+    </div>
+    <div class="footer">
+      <button id="authSignIn" class="btn primary">כניסה</button>
+      <button id="authSignUp" class="btn">הרשמה</button>
+      <button id="authReset" class="btn">איפוס סיסמה</button>
+      <button id="authCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+
+  <dialog id="tripModal" class="modal">
+    <header><strong>נסיעה חדשה</strong></header>
+    <div class="body">
+      <label>יעד<input id="tripDest" class="input"/></label>
+      <div class="row"><label>תאריך התחלה<input type="date" id="tripStart" class="input"></label><label>תאריך סיום<input type="date" id="tripEnd" class="input"></label></div>
+    </div>
+    <div class="footer">
+      <button id="tripSave" class="btn primary">שמור</button>
+      <button id="tripCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+
+  <dialog id="expenseModal" class="modal">
+    <header><strong>הוצאה</strong></header>
+    <div class="body">
+      <label>תיאור<input id="expDesc" class="input"/></label>
+      <label>קטגוריה
+        <select id="expCat" class="input">
+          <option value="">בחר...</option>
+          <option>טיסה</option>
+          <option>לינה</option>
+          <option>תקשורת</option>
+          <option>רכב</option>
+          <option>ביטוח בריאות</option>
+          <option>מזון - מסעדות / סופר</option>
+          <option>קניות</option>
+          <option>אטרקציות</option>
+          <option>אחר</option>
+        </select>
+      </label>
+      <div class="row"><label>סכום<input id="expAmount" type="text" class="input money"></label><label>מטבע<select id="expCurr" class="input"><option>USD</option><option>EUR</option><option>ILS</option></select></label></div>
+      <div class="row location-row">
+        <label>מיקום<input id="expLocationName" class="input" placeholder="בחר עפ״י שם"/></label>
+        <button id="btnSelectExpLocation" class="btn location-btn">בחר ע"ג מפה</button>
+        <button id="btnUseCurrentExp" class="btn location-btn">בחר מיקום נוכחי</button>
+        <input type="hidden" id="expLat" />
+        <input type="hidden" id="expLng" />
+      </div>
+    </div>
+    <div class="footer">
+      <button id="expSave" class="btn primary">שמור</button>
+      <button id="expDelete" class="btn danger" style="display:none">מחק</button>
+      <button id="expCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+
+
+
+<dialog id="rowMenuModal" class="modal">
+  <header><strong>פעולות</strong></header>
+  <div class="body"><p class="muted">בחר פעולה עבור הפריט.</p></div>
+  <div class="footer">
+    <button id="rowMenuEdit" class="btn">ערוך</button>
+    <button id="rowMenuDelete" class="btn danger">מחק</button>
+    <button id="rowMenuCancel" class="btn">ביטול</button>
+  </div>
+</dialog>
+
+
+  <dialog id="journalModal" class="modal">
+    <header><strong>רישום יומן</strong></header>
+    <div class="body">
+      <label>תיאור<textarea id="jrText" class="input"></textarea></label>
+      <div class="row location-row">
+        <label>מיקום<input id="jrLocationName" class="input" placeholder="בחר עפ״י שם"/></label>
+        <button id="btnSelectJrLocation" class="btn location-btn">בחר ע"ג מפה</button>
+        <button id="btnUseCurrentJr" class="btn location-btn">בחר מיקום נוכחי</button>
+        <input type="hidden" id="jrLat" />
+        <input type="hidden" id="jrLng" />
+      </div>
+    </div>
+    <div class="footer">
+      <button id="jrSave" class="btn primary">שמור</button>
+      <button id="jrDelete" class="btn danger" style="display:none">מחק</button>
+      <button id="jrCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="unsavedChangesModal" class="modal">
+    <header><strong>שינויים שלא נשמרו</strong></header>
+    <div class="body">
+        <p>ישנם שינויים שלא נשמרו. האם תרצה לשמור אותם לפני שאתה עוזב את הדף?</p>
+    </div>
+    <div class="footer">
+        <button id="unsavedSave" class="btn primary">שמור שינויים</button>
+        <button id="unsavedDiscard" class="btn danger">התעלם משינויים</button>
+        <button id="unsavedCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+  
+  <dialog id="mapSelectModal" class="modal">
+    <header><strong>בחר מיקום על המפה</strong></header>
+    <div class="body">
+      <div id="selectMap" class="leaflet-container" style="height:350px"></div>
+    </div>
+    <div class="footer">
+      <button id="selectMapSave" class="btn primary">שמור מיקום</button>
+      <button id="selectMapCancel" class="btn">ביטול</button>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script type="module" src="./firebase.js"></script>
+  <script type="module" src="./script.js"></script>
+
+<dialog id="confirmDeleteModal" class="modal">
+  <header><strong>לאשר מחיקה?</strong></header>
+  <div class="body"><p>האם אתה בטוח שברצונך למחוק? הפעולה אינה ניתנת לביטול.</p></div>
+  <div class="footer">
+    <button id="confirmDeleteYes" class="btn danger">מחק</button>
+    <button id="confirmDeleteNo" class="btn">ביטול</button>
+  </div>
+</dialog>
 </body>
 </html>
