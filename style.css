@@ -511,3 +511,76 @@ td a.external-link {
 #btnToggleSpent.active{ background:#ff8c00; color:#111; border-color:#ff8c00; }
 #btnToggleVisited{ border-color:#1e90ff; color:#1e90ff; }
 #btnToggleVisited.active{ background:#1e90ff; color:#fff; border-color:#1e90ff; }
+
+
+/* === Added by ChatGPT: Uniform Location Controls (input + 2 buttons) === */
+.location-row{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+.location-row label{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+}
+.location-row label .input{
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  padding: 0;
+  font-size: 14px;
+  line-height: 44px;
+}
+.location-row .location-btn{
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+@media (max-width: 520px){
+  .location-row{ grid-template-columns: 1fr 1fr; }
+  .location-row > *:last-child{ grid-column: 1 / -1; }
+}
+/* === End addition === */
+
+
+
+/* === Share card spacing improvements === */
+#view-share .cards .card:last-child .row{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:16px;
+}
+#view-share .cards .card:last-child .row + .row{ margin-top:14px; }
+#view-share .cards .card:last-child .btn{ width:100%; }
+#view-share .cards .card:last-child .input{ width:100%; }
+
+
+/* === Spacing fixes for ייבוא/ייצוא/שיתוף panel === */
+#view-share .card .row{
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#view-share .input,
+#view-share .btn,
+#view-share select.input{
+  height: 44px; /* consistent control height */
+}
+#view-share .card h3{
+  margin-bottom: 10px;
+}
+
+/* extra spacing refinement for import/export cards */
+#view-share .card .row + .row { margin-top: 12px; }
+#view-share input[type="file"].input { padding: 10px 12px; }

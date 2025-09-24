@@ -418,6 +418,13 @@ async function loadTrip(){
     <div class="muted">${fmtDate(t.start)} – ${fmtDate(t.end)}</div>
     <div>משתתפים: ${esc((t.people||[]).join(', '))}</div>
     <div>סוגים: ${esc((t.types||[]).join(', '))}</div>
+    ${(() => {
+      const b = t.budget || {};
+      const pairs = Object.entries(b).filter(([k,v]) => Number(v) > 0);
+      if (!pairs.length) return '';
+      const line = pairs.map(([k,v]) => `${k} ${formatInt(v)}`).join(' · ');
+      return `<div>תקציב: ${line}</div>`;
+    })()}
   `;
   // Populate meta form
   $('#metaDestination').value = t.destination||'';
@@ -709,7 +716,7 @@ $('#btnViewList').addEventListener('click', ()=>{ state.viewMode='list'; renderT
 $('#btnSaveMeta').addEventListener('click', async ()=>{
   const ref = FB.doc(db, 'trips', state.currentTripId);
   const people = $('#metaPeople').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const types = $$('.metaType.active').map(b=>b.dataset.value);
+  const types = $$('.metaType').map(b=>b.dataset.value);
   const destination = $('#metaDestination').value.trim();
   const localCur = getLocalCurrency(destination);
   await FB.updateDoc(ref, { destination, start: $('#metaStart').value, end: $('#metaEnd').value, people, types, localCurrency: localCur });
@@ -1405,3 +1412,347 @@ document.addEventListener('click', (ev) => {
     try { toggleExpenseSort(); } catch(e) { console.error('toggleExpenseSort failed', e); }
   }
 });
+
+// === SHARE / IMPORT / EXPORT (Last Tab) ===
+
+// helper to get safe current trip or fallback
+function currentTrip(){ return state?.current || {}; }
+function asArray(o){ return Array.isArray(o)? o : (o? Object.values(o): []); }
+
+// Build a minimal HTML block for export (RTL + Hebrew-safe)
+// Load html2canvas for Hebrew-safe PDF (render as image)
+async function ensureHtml2Canvas(){
+  if (typeof window.html2canvas !== 'undefined') return true;
+  return await loadExternalScript([
+    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+  ]);
+}
+
+
+/* removed duplicate exportPDF */
+
+
+
+/* removed duplicate exportExcel */
+
+
+
+/* removed duplicate exportWord */
+
+
+
+
+function exportGPX(){
+  const t = currentTrip();
+  if(!t.id){ toast('פתח נסיעה'); return; }
+  const items = [...asArray(t.journal).map(x=>({...x, _type:'journal'})),
+                 ...asArray(t.expenses).map(x=>({...x, _type:'expense'}))]
+    .filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
+  const wpts = items.map(p => `
+  <wpt lat="${p.lat}" lon="${p.lng}">
+    <name>${esc(p.title||p.place||'נקודה')}</name>
+    <desc>${esc(p.desc||'')}</desc>
+    ${p.date ? `<time>${new Date(p.date).toISOString()}</time>` : ''}
+    <extensions>
+      ${p.cat ? `<category>${esc(p.cat)}</category>` : ''}
+      <source>${p._type}</source>
+    </extensions>
+  </wpt>`).join('');
+
+  // Build a track in chronological order
+  const trksegs = items.length ? `
+  <trk><name>${esc(t.destination||'מסלול נסיעה')}</name>
+    <trkseg>
+      ${items.map(p => `<trkpt lat="${p.lat}" lon="${p.lng}">${p.date ? `<time>${new Date(p.date).toISOString()}</time>`:''}</trkpt>`).join('')}
+    </trkseg>
+  </trk>` : '';
+
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="FLYMILY" xmlns="http://www.topografix.com/GPX/1/1">
+  ${wpts}
+  ${trksegs}
+</gpx>`;
+
+  const blob = new Blob([gpx], {type:'application/gpx+xml'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `FLYMILY_${(t.destination||'trip').replace(/\s+/g,'_')}.gpx`; a.click(); URL.revokeObjectURL(a.href);
+}
+// Import JSON
+$('#btnImport')?.addEventListener('click', async ()=>{
+  const inp = $('#importFile');
+  if(!inp?.files?.length) return toast('בחר קובץ JSON');
+  try{
+    const txt = await inp.files[0].text();
+    const data = JSON.parse(txt);
+    if(!data || typeof data !== 'object') throw new Error('bad file');
+    if(!confirm('ייבוא יחליף את נתוני הנסיעה הנוכחית. להמשיך?')) return;
+    // merge minimally into current trip doc in Firestore
+    const ref = FB.doc(db, 'trips', state.currentTripId);
+    await FB.updateDoc(ref, {
+      destination: data.destination ?? state.current.destination,
+      start: data.start ?? state.current.start,
+      end: data.end ?? state.current.end,
+      people: data.people ?? state.current.people ?? [],
+      types: data.types ?? state.current.types ?? [],
+      budget: data.budget ?? state.current.budget ?? {},
+      rates: data.rates ?? state.current.rates ?? state.rates,
+      expenses: data.expenses ?? state.current.expenses ?? {},
+      journal: data.journal ?? state.current.journal ?? {},
+    });
+    toast('ייבוא הושלם'); await loadTrip();
+  }catch(e){ console.error(e); toast('שגיאה בייבוא'); }
+});
+
+// Export buttons
+$('#btnExportPDF')?.addEventListener('click', exportPDF);
+$('#btnExportExcel')?.addEventListener('click', exportExcel);
+$('#btnExportWord')?.addEventListener('click', exportWord);
+$('#btnExportGPX')?.addEventListener('click', exportGPX);
+
+// Share controls
+$('#btnEnableShare')?.addEventListener('click', async ()=>{
+  if(!state.currentTripId) return toast('פתח נסיעה');
+  const token = crypto.randomUUID().slice(0,8);
+  const ref = FB.doc(db, 'trips', state.currentTripId);
+  const link = `${location.origin}${location.pathname}?share=${state.currentTripId}:${token}`;
+  await FB.updateDoc(ref, { share: { enabled:true, token } });
+  $('#shareLink').value = link;
+  toast('שיתוף הופעל');
+});
+$('#btnDisableShare')?.addEventListener('click', async ()=>{
+  if(!state.currentTripId) return;
+  const ref = FB.doc(db, 'trips', state.currentTripId);
+  await FB.updateDoc(ref, { share: { enabled:false } });
+  $('#shareLink').value = '';
+  toast('שיתוף בוטל');
+});
+$('#btnCopyShare')?.addEventListener('click', ()=>{
+  const val = $('#shareLink')?.value; if(!val) return toast('אין קישור לשיתוף');
+  navigator.clipboard.writeText(val).then(()=> toast('הועתק'));
+});
+
+
+// === PATCH: Full export must include all tabs (Meta, Expenses, Journal) ===
+
+// Format helpers for meta
+function kvRowsFromMeta(trip){
+  const rows = [];
+  rows.push({ שדה:'יעד', ערך: esc(trip.destination||'') });
+  rows.push({ שדה:'תאריכים', ערך: `${fmtDate(trip.start)} – ${fmtDate(trip.end)}` });
+  if (trip.people && trip.people.length) rows.push({ שדה:'משתתפים', ערך: esc(trip.people.join(', ')) });
+  if (trip.types && trip.types.length) rows.push({ שדה:'סוג טיול', ערך: esc(trip.types.join(', ')) });
+  // Budget (flatten one level)
+  if (trip.budget && typeof trip.budget === 'object'){
+    const pairs = [];
+    if (Number(trip.budget.USD) > 0) pairs.push(`USD: ${formatInt(trip.budget.USD)}`);
+    if (Number(trip.budget.EUR) > 0) pairs.push(`EUR: ${formatInt(trip.budget.EUR)}`);
+    if (Number(trip.budget.ILS) > 0) pairs.push(`ILS: ${formatInt(trip.budget.ILS)}`);
+    if (pairs.length) rows.push({ שדה:'תקציב', ערך: pairs.join(' | ') });
+  }
+  // Rates
+  if (trip.rates && typeof trip.rates === 'object'){
+    const parts = [];
+    if (trip.rates.USDILS) parts.push(`USDILS: ${trip.rates.USDILS}`);
+    if (trip.rates.USDEUR) parts.push(`USDEUR: ${trip.rates.USDEUR}`);
+    if (trip.rates.USDLocal) parts.push(`USDLocal: ${trip.rates.USDLocal}`);
+    if (parts.length) rows.push({ שדה:'שערי מטבע', ערך: parts.join(' | ') + (trip.rates.lockedAt ? ` | lockedAt: ${dayjs(trip.rates.lockedAt).toISOString()}` : '') });
+  }
+  return rows;
+}
+
+// override
+function buildExportContainer(trip){
+  const c = document.createElement('div');
+  c.style.width = '794px';
+  c.style.direction = 'rtl';
+  c.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial';
+  c.style.color = '#111';
+  c.style.background = '#fff';
+  c.style.padding = '16px';
+  const metaRows = kvRowsFromMeta(trip).map(r => `<tr><td>${r['שדה']}</td><td>${r['ערך']}</td></tr>`).join('');
+  
+  // Get expenses and journal from the trip object, not the flattened array.
+  const expenses = Object.values(trip.expenses || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||''));
+  const journal = Object.values(trip.journal || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||''));
+
+  c.innerHTML = `
+    <h1 style="margin:0 0 8px">הטיול שלי – ${esc(trip.destination||'ללא יעד')}</h1>
+    <div style="opacity:.8;margin-bottom:12px">${fmtDate(trip.start)} – ${fmtDate(trip.end)}</div>
+
+    <h2 style="margin:12px 0 6px">נתוני נסיעה</h2>
+    <table style="width:100%;border-collapse:collapse" border="1" cellspacing="0" cellpadding="6">
+      <thead><tr><th>שדה</th><th>ערך</th></tr></thead>
+      <tbody>${metaRows}</tbody>
+    </table>
+
+    <h2 style="margin:16px 0 6px">יומן יומי</h2>
+    <table style="width:100%;border-collapse:collapse" border="1" cellspacing="0" cellpadding="6">
+      <thead><tr>
+        <th>תאריך</th><th>מקום</th><th>תיאור</th>
+      </tr></thead>
+      <tbody>
+        ${journal.map(j => `
+          <tr>
+            <td>${esc(fmtDateTime(j.createdAt))}</td>
+            <td>${esc(j.placeName||'')}</td>
+            <td>${esc(j.text||'')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <h2 style="margin:16px 0 6px">הוצאות</h2>
+    <table style="width:100%;border-collapse:collapse" border="1" cellspacing="0" cellpadding="6">
+      <thead><tr>
+        <th>תיאור</th><th>קטגוריה</th><th>סכום</th><th>מטבע</th><th>תאריך</th>
+      </tr></thead>
+      <tbody>
+        ${expenses.map(e => `
+          <tr>
+            <td>${esc(e.desc||'')}</td>
+            <td>${esc(e.category||'')}</td>
+            <td>${esc(String(e.amount ?? ''))}</td>
+            <td>${esc(e.currency||'')}</td>
+            <td>${esc(fmtDateTime(e.createdAt))}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+  return c;
+}
+
+// override PDF to always include all sections
+async function exportPDF(){
+  const t = currentTrip();
+  if(!t.id){ toast('פתח נסיעה'); return; }
+  const ok1 = await ensureJsPDF();
+  const ok2 = await ensureHtml2Canvas();
+  if(!ok1 || !ok2){ toast('בעיה בטעינת ספריות PDF'); return; }
+
+  const { jsPDF } = window.jspdf || window;
+  const doc = new jsPDF({orientation:'p', unit:'pt', format:'a4'});
+  const container = buildExportContainer(t);
+  document.body.appendChild(container);
+
+  const blocks = Array.from(container.children);
+  let first = true;
+  for (const block of blocks){
+    const canvas = await html2canvas(block, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
+    const w = canvas.width * ratio;
+    const h = canvas.height * ratio;
+    if (!first) doc.addPage();
+    first = false;
+    doc.addImage(imgData, 'PNG', (pageW - w)/2, 24, w, h, undefined, 'FAST');
+  }
+  container.remove();
+  const file = `FLYMILY_${(t.destination||'trip').replace(/\s+/g,'_')}.pdf`;
+  doc.save(file);
+}
+
+// override Excel
+async function exportExcel(){
+  const t = currentTrip();
+  if(!t.id){ toast('פתח נסיעה'); return; }
+  const ok = await ensureXLSX(); if(!ok){ toast('בעיה בייצוא Excel'); return; }
+  const wb = XLSX.utils.book_new();
+
+  const meta = kvRowsFromMeta(t);
+  const s0 = XLSX.utils.json_to_sheet(meta);
+  XLSX.utils.book_append_sheet(wb, s0, 'נתוני נסיעה');
+
+  const jr = Object.values(t.journal || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||'')).map(j=>({ תאריך: fmtDateTime(j.createdAt), מקום:j.placeName||'', תיאור:j.text||'' }));
+  const s1 = XLSX.utils.json_to_sheet(jr);
+  XLSX.utils.book_append_sheet(wb, s1, 'יומן יומי');
+
+  const ex = Object.values(t.expenses || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||'')).map(e=>({ תיאור:e.desc||'', קטגוריה:e.category||'', סכום:e.amount||'', מטבע:e.currency||'', תאריך:fmtDateTime(e.createdAt)}));
+  const s2 = XLSX.utils.json_to_sheet(ex);
+  XLSX.utils.book_append_sheet(wb, s2, 'הוצאות');
+
+  const fn = `FLYMILY_${(t.destination||'trip').replace(/\s+/g,'_')}.xlsx`;
+  XLSX.writeFile(wb, fn);
+}
+
+// override Word
+async function exportWord(){
+  const t = currentTrip();
+  if(!t.id){ toast('פתח נסיעה'); return; }
+  const ok = await ensureDOCX(); if(!ok){ toast('בעיה בייצוא Word'); return; }
+  const { Document, Packer, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } = docx;
+
+  const metaRows = kvRowsFromMeta(t).map(r =>
+    new TableRow({ children:[
+      new TableCell({ children:[new Paragraph(r['שדה'])]}),
+      new TableCell({ children:[new Paragraph(String(r['ערך']))]}),
+    ]})
+  );
+  const metaTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [ new TableRow({ children:[
+      new TableCell({ children:[new Paragraph({text:'שדה', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'ערך', alignment: AlignmentType.CENTER})]}),
+    ]}), ...metaRows ]
+  });
+
+  const journalRows = Object.values(t.journal || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||'')).map(j =>
+    new TableRow({
+      children:[
+        new TableCell({ children:[new Paragraph(fmtDateTime(j.createdAt)||'')]}),
+        new TableCell({ children:[new Paragraph(j.placeName||'')]}),
+        new TableCell({ children:[new Paragraph(j.text||'')]}),
+      ]
+    })
+  );
+  const jrTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [ new TableRow({ children:[
+      new TableCell({ children:[new Paragraph({text:'תאריך', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'מקום', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'תיאור', alignment: AlignmentType.CENTER})]}),
+    ]}), ...journalRows ]
+  });
+
+  const exRows = Object.values(t.expenses || {}).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||'')).map(e =>
+    new TableRow({ children:[
+      new TableCell({ children:[new Paragraph(e.desc||'')]}),
+      new TableCell({ children:[new Paragraph(e.category||'')]}),
+      new TableCell({ children:[new Paragraph(String(e.amount ?? ''))]}),
+      new TableCell({ children:[new Paragraph(e.currency||'')]}),
+      new TableCell({ children:[new Paragraph(fmtDateTime(e.createdAt)||'')]}),
+    ]})
+  );
+  const exTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [ new TableRow({ children:[
+      new TableCell({ children:[new Paragraph({text:'תיאור', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'קטגוריה', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'סכום', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'מטבע', alignment: AlignmentType.CENTER})]}),
+      new TableCell({ children:[new Paragraph({text:'תאריך', alignment: AlignmentType.CENTER})]}),
+    ]}), ...exRows ]
+  });
+
+  const doc = new Document({
+    sections:[{
+      properties:{},
+      children:[
+        new Paragraph({ text:`הטיול שלי – ${t.destination||''}`, heading: HeadingLevel.TITLE }),
+        new Paragraph({ text:`${fmtDate(t.start)} – ${fmtDate(t.end)}` }),
+        new Paragraph({ text:'נתוני נסיעה', heading: HeadingLevel.HEADING_2 }),
+        metaTable,
+        new Paragraph({ text:'יומן יומי', heading: HeadingLevel.HEADING_2 }),
+        jrTable,
+        new Paragraph({ text:'הוצאות', heading: HeadingLevel.HEADING_2 }),
+        exTable
+      ]
+    }]
+  });
+  const blob = await Packer.toBlob(doc);
+  const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
+  link.download = `FLYMILY_${(t.destination||'trip').replace(/\s+/g,'_')}.docx`; link.click(); URL.revokeObjectURL(link.href);
+}
