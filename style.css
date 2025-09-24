@@ -584,3 +584,7 @@ td a.external-link {
 /* extra spacing refinement for import/export cards */
 #view-share .card .row + .row { margin-top: 12px; }
 #view-share input[type="file"].input { padding: 10px 12px; }
+
+/* --- Hotfix: ensure mini map in 'Overview' has height and is visible --- */
+#miniMap { min-height: 280px; height: 32vh; }
+.tab[data-tab="overview"] #miniMap { display: block; }

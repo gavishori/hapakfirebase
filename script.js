@@ -186,7 +186,7 @@ $$('#tabs button').forEach(btn => btn.addEventListener('click', (e) => {
   $$('.tabview').forEach(v=>v.hidden = true);
   $('#view-'+btn.dataset.tab).hidden = false;
   if(btn.dataset.tab==='map') setTimeout(initBigMap, 50);
-  if(btn.dataset.tab==='overview') { setTimeout(()=> { initMiniMap(state.current||{}); invalidateMap(state.maps?.mini); }, 80);}
+  if(btn.dataset.tab==='overview') { setTimeout(()=> { try{ initBigMap(); }catch(_){} initMiniMap(state.current||{}); invalidateMap(state.maps?.mini); }, 80);}
 }));
 
 // Auth UI
@@ -571,61 +571,69 @@ function initMiniMap(t) {
   if (!container) return;
   if (!state.maps.mini) {
     state.maps.mini = L.map(container);
+    // Extra: Observe size changes and re-invalidate Leaflet (helps when tab becomes visible)
+    try {
+      if (!state.maps._miniResizeObs) {
+        state.maps._miniResizeObs = new ResizeObserver(() => {
+          try { state.maps.mini && state.maps.mini.invalidateSize(); } catch {}
+        });
+        state.maps._miniResizeObs.observe(container);
+      }
+    } catch (_) {}
   }
   const m = state.maps.mini;
 
-  // Choose the tile layer based on destination
+  // Use the exact same tile strategy as the Big Map
   const isIsraelTrip = state.current?.destination?.includes('ישראל');
   const tileUrl = isIsraelTrip
-    ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    ? 'https://cdn.maptiler.com/maptiler-toner-hi/{z}/{x}/{y}.png'
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const attribution = '© OpenStreetMap contributors';
+  const attribution = isIsraelTrip
+    ? '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
+    : '© OpenStreetMap contributors';
 
-  // We are using OpenStreetMap as the primary map layer as it's reliable and free.
-  // For Israel, it supports some Hebrew names but not all. For this, we'll try to get the
-  // language via the browser or use a different tile layer that supports Hebrew.
-  // We'll use a tile layer that supports Hebrew names for Israel specifically.
-  if (isIsraelTrip) {
-    if (!state.maps._miniTiles || state.maps._miniTiles.url !== 'https://cdn.maptiler.com/maptiler-toner-hi/{z}/{x}/{y}.png') {
-      if (state.maps._miniTiles) {
-        m.removeLayer(state.maps._miniTiles);
-      }
-      state.maps._miniTiles = L.tileLayer('https://cdn.maptiler.com/maptiler-toner-hi/{z}/{x}/{y}.png', {
-        attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
-      }).addTo(m);
+  // (Re)apply tiles only if changed
+  if (!state.maps._miniTiles || state.maps._miniTiles._url !== tileUrl) {
+    if (state.maps._miniTiles) {
+      try { m.removeLayer(state.maps._miniTiles); } catch {}
     }
-  } else {
-    if (!state.maps._miniTiles || state.maps._miniTiles.url !== tileUrl) {
-      if (state.maps._miniTiles) {
-        m.removeLayer(state.maps._miniTiles);
-      }
-      state.maps._miniTiles = L.tileLayer(tileUrl, { attribution }).addTo(m);
-    }
+    state.maps._miniTiles = L.tileLayer(tileUrl, { attribution }).addTo(m);
   }
 
+  // Layers
   if (!state.maps.layers) state.maps.layers = {};
   if (!state.maps.layers.mini) {
     state.maps.layers.mini = L.layerGroup().addTo(m);
   }
   state.maps.layers.mini.clearLayers();
 
-  const journal = Object.values((t && t.journal) || {}).filter(j => j.lat && j.lng);
-  const expenses = Object.values((t && t.expenses) || {}).filter(e => e.lat && e.lng);
+  // Data comes from the same source used by the Map tab
+  const tcur = state.current || t || {};
+  const exps = Object.values(tcur.expenses || {}).filter(e => e.lat && e.lng);
+  const jrs  = Object.values(tcur.journal  || {}).filter(j => j.lat && j.lng);
 
-  expenses.forEach(e => L.circleMarker([e.lat, e.lng], { radius: 6, color: '#ff8c00' }).addTo(state.maps.layers.mini));
-  journal.forEach(j => L.circleMarker([j.lat, j.lng], { radius: 6, color: '#1e90ff' }).addTo(state.maps.layers.mini));
+  // Draw like the big map (with simple popups)
+  exps.forEach(e => L.circleMarker([e.lat, e.lng], { radius: 6, color: '#ff8c00' })
+    .bindPopup(`${esc(e.desc||'')}: ${num(e.amount||0)} ${e.currency||''}`)
+    .addTo(state.maps.layers.mini));
+  jrs.forEach(j => L.circleMarker([j.lat, j.lng], { radius: 6, color: '#1e90ff' })
+    .bindPopup(`${esc(j.placeName||'')}: ${linkifyText(j.text || '')}`)
+    .addTo(state.maps.layers.mini));
 
+  // Fit
   const layer = state.maps.layers.mini;
-  if (layer.getLayers().length) {
-    try {
+  try {
+    const layers = layer && layer.getLayers ? layer.getLayers() : [];
+    if (layers && layers.length) {
       m.fitBounds(layer.getBounds(), { padding: [20, 20] });
-    } catch {}
-  } else {
-    try {
-      m.setView([31.5, 34.8], 4);
-    } catch {}
-  }
-  setTimeout(() => m.invalidateSize(), 100);
+    } else {
+      m.setView([31.5, 34.8], 5);
+    }
+  } catch {}
+
+  // Robust invalidation when the 'Overview' tab becomes visible
+  setTimeout(() => { try { m.invalidateSize(); } catch {} }, 80);
+  setTimeout(() => { try { m.invalidateSize(); } catch {} }, 320);
 }
 function initBigMap(){
   if(!state.current) return;
@@ -1756,3 +1764,60 @@ async function exportWord(){
   const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
   link.download = `FLYMILY_${(t.destination||'trip').replace(/\s+/g,'_')}.docx`; link.click(); URL.revokeObjectURL(link.href);
 }
+
+
+
+// ===== Auth UI helpers (final) =====
+function mapAuthError(code) {
+  const m = {
+    'auth/user-not-found': 'משתמש לא קיים. נסה הרשמה.',
+    'auth/wrong-password': 'סיסמה שגויה.',
+    'auth/invalid-email': 'אימייל לא תקין.',
+    'auth/missing-email': 'נא להזין אימייל.',
+    'auth/missing-password': 'נא להזין סיסמה.',
+    'auth/too-many-requests': 'יותר מדי נסיונות. נסה מאוחר יותר.',
+    'auth/unauthorized-domain': 'הדומיין לא מורשה באימות.',
+  };
+  return m[code] || (code || 'שגיאת התחברות לא צפויה');
+}
+
+(function wireLogin(){
+  const btn = document.querySelector('#loginBtn, button[data-action="login"], .login-btn');
+  const emailEl = document.querySelector('#email, input[type="email"][name="email"], input[type="email"]');
+  const passEl  = document.querySelector('#password, input[type="password"][name="password"], input[type="password"]');
+  if(!btn) return;
+  btn.addEventListener('click', async () => {
+    try {
+      btn.disabled = true; const prev = btn.textContent; btn.textContent = 'מתחבר…';
+      const email = (emailEl && emailEl.value ? emailEl.value : '').trim();
+      const pass  = (passEl && passEl.value ? passEl.value : '');
+      if (!email) { alert(mapAuthError('auth/missing-email')); return; }
+      if (!pass)  { alert(mapAuthError('auth/missing-password')); return; }
+      const cred = await FB.signInWithEmailAndPassword(FB.auth, email, pass);
+      console.log('login ok', cred?.user?.uid);
+    } catch(err) {
+      console.warn('login error', err);
+      alert(mapAuthError(err?.code));
+    } finally {
+      btn.disabled = false; btn.textContent = 'כניסה';
+    }
+  });
+})();
+
+// Toggle app/login screens on auth state change + start subscriptions
+if (typeof FB !== 'undefined' && FB?.onAuthStateChanged) {
+  FB.onAuthStateChanged(FB.auth, (user) => {
+    console.log('auth state', !!user, user?.uid);
+    const loginScreen = document.getElementById('loginScreen');
+    const appEl = document.getElementById('app');
+    if (user) {
+      if (loginScreen) loginScreen.style.display = 'none';
+      if (appEl) appEl.style.display = 'block';
+      try { subscribeTrips(user.uid); } catch(e){ console.warn('subscribeTrips error', e); }
+    } else {
+      if (appEl) appEl.style.display = 'none';
+      if (loginScreen) loginScreen.style.display = 'grid';
+    }
+  });
+}
+try { console.log('firebase project', FB?.auth?.app?.options?.projectId); } catch(e){}
