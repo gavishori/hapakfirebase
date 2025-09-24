@@ -1,590 +1,90 @@
 :root{
-  --bg:#0f1115; --card:#151922; --ink:#e9eef4; --muted:#9fb0c0; --brand:#8bd3ff; --accent:#ffd166; --ok:#06d6a0; --danger:#ef476f;
-  --border:#273142; --shadow:0 10px 30px rgba(0,0,0,.25);
+  --bg:#0b0f19; --card:rgba(255,255,255,.06); --ink:#eef3ff; --muted:#9fb0c0;
+  --brand:#6ee7ff; --accent:#ffd166; --ok:#4ade80; --danger:#ff5c8a; --border:rgba(255,255,255,.12);
+  --shadow:0 18px 40px rgba(0,0,0,.45); --blur:12px;
 }
 [data-theme="light"]{
-  --bg:#f7f8fb; --card:#ffffff; --ink:#0e1116; --muted:#415266; --brand:#0077ff; --accent:#faad14; --ok:#089e71; --danger:#d9363e; --border:#e6e9ef; --shadow:0 10px 20px rgba(0,0,0,.06);
+  --bg:#f5f7fb; --card:rgba(255,255,255,.9); --ink:#0e1116; --muted:#4b5b6b;
+  --brand:#0066ff; --accent:#ff9d1b; --ok:#10a960; --danger:#e54063; --border:rgba(0,0,0,.08);
+  --shadow:0 16px 28px rgba(0,0,0,.08); --blur:6px;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,system-ui,-apple-system,Segoe UI,Roboto,Arial;overflow:hidden;direction:rtl}
-a{color:var(--brand);text-decoration:none}
-.app{display:grid;grid-template-rows:auto 1fr}
-header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
-header .brand{font-weight:700;letter-spacing:.5px}
-header .spacer{flex:1}
-header button, .btn{background:transparent;border:1px solid var(--border);color:var(--ink);padding:8px 12px;border-radius:12px;cursor:pointer}
-.btn.primary{border-color:var(--brand);background:color-mix(in oklab, var(--brand) 20%, transparent)}
-.btn.danger{border-color:var(--danger);color:var(--danger)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+body{margin:0;background:radial-gradient(1200px 500px at 80% -10%, #11203a 0%, var(--bg) 60%);color:var(--ink);
+  font-family:Rubik,system-ui,-apple-system,Segoe UI,Roboto,Arial;overflow-x:hidden;direction:rtl}
 
-.container{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 56px)}
-.sidebar{border-inline-start:1px solid var(--border);background:var(--card);padding:16px;overflow:auto}
+a{color:var(--brand);text-decoration:none}
+img{max-width:100%;display:block}
+button{cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;clip-path:inset(50%)}
+
+.app{display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{display:flex;align-items:center;gap:12px;padding:10px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.00));
+  backdrop-filter:saturate(120%) blur(var(--blur));
+}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.brand-text{font-weight:800;letter-spacing:.6px}
+.spacer{flex:1}
+.badge{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.04)}
+
+.btn{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--ink);
+  padding:12px 16px;border-radius:16px;transition:transform .06s ease, background .2s ease}
+.btn:active{transform:scale(.98)}
+.btn.primary{border-color:color-mix(in oklab, var(--brand) 50%, transparent);
+  background:linear-gradient(180deg, color-mix(in oklab, var(--brand) 35%, transparent), transparent)}
+.btn.subtle{background:transparent}
+.btn.link{border:none;color:var(--brand);padding:8px 0}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.xl{font-size:1.06rem;padding:14px 18px;border-radius:18px}
+
+.input, select, textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);
+  color:var(--ink);padding:14px;border-radius:16px;outline:none}
+.input.lg{font-size:1rem}
+.input.xl{font-size:1.08rem}
+textarea{min-height:100px}
+
+.container{display:grid;grid-template-columns:1fr;gap:0;min-height:calc(100vh - 60px)}
+.sidebar{padding:16px;border-bottom:1px solid var(--border);background:transparent;overflow:auto}
 .content{padding:16px;overflow:auto}
 
-.section-title{display:flex;align-items:center;gap:10px;margin:8px 0 12px}
-.input, select, textarea{width:100%;background:transparent;border:1px solid var(--border);color:var(--ink);padding:10px 12px;border-radius:10px;outline:none}
-textarea{min-height:80px}
-.row{display:flex;gap:10px}
-.row > *{flex:1}
+.section-title{display:flex;align-items:center;gap:10px;margin:6px 0 12px}
+.list-actions{display:flex;gap:10px;align-items:center;margin:10px 0}
+.list-actions.sticky{position:sticky;top:64px;background:linear-gradient(180deg, rgba(11,15,25,.9), rgba(11,15,25,.2));
+  padding:10px;border-radius:14px;backdrop-filter:blur(var(--blur));z-index:9}
+.tabs{position:sticky;bottom:0;inset-inline:0;display:flex;gap:8px;
+  background:linear-gradient(0deg, rgba(0,0,0,.2), rgba(0,0,0,0));
+  border-top:1px solid var(--border);padding:10px;z-index:20}
+.tabs button{flex:1;border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.04)}
+.tabs button.active{outline:2px solid color-mix(in oklab, var(--brand) 45%, transparent)}
 
-.list-actions{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-.tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);padding-bottom:8px;z-index:4}
-.tabs button{padding:10px 12px;border-radius:12px 12px 0 0;border:1px solid var(--border);border-bottom:none;background:var(--card)}
-.tabs button.active{outline:2px solid color-mix(in oklab, var(--brand) 40%, transparent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;
+  box-shadow:var(--shadow);backdrop-filter:blur(var(--blur)) saturate(120%)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.list{display:flex;flex-direction:column;gap:10px}
 
-.trip-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.list{display:flex;flex-direction:column;gap:8px}
-.trip-row{
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-.trip-row > div:first-child {
-  display: flex;
-  flex-direction: column;
-}
-.trip-row .pill {
-  width: fit-content;
-  margin-top: 4px;
-}
-.muted{color:var(--muted)}
-.pill{border:1px solid var(--border);padding:4px 8px;border-radius:999px;font-size:.85rem}
-
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
 table{width:100%;border-collapse:separate;border-spacing:0}
-th,td{border-bottom:1px solid var(--border);padding:10px;text-align:right}
-th{position:sticky;top:0;background:var(--card)}
+th,td{border-bottom:1px solid var(--border);padding:12px;text-align:right}
+th{position:sticky;top:0;background:rgba(255,255,255,.04);backdrop-filter:blur(var(--blur))}
 
-.menu{position:relative}
-.menu-btn{border:1px solid var(--border);background:transparent;border-radius:10px;padding:6px 10px}
-.menu-list{position:absolute;left:0;top:36px;background:var(--card);border:1px solid var(--border);border-radius:12px;min-width:160px;display:none;z-index:3}
-.menu-list.open{display:block}
-.menu-list button{display:block;width:100%;padding:10px;background:transparent;border:none;text-align:right}
+.pill{border:1px solid var(--border);padding:8px 12px;border-radius:999px;font-size:.9rem;background:rgba(255,255,255,.04)}
+.muted{color:var(--muted)}
 
-.leaflet-container{height:420px;border-radius:16px;border:1px solid var(--border)}
-.map-toolbar{position:absolute;left:64px;top:12px;display:flex;gap:10px;z-index:1200;pointer-events:auto}
+.leaflet-container{height:380px;border-radius:18px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.map-wrapper{position:relative}
+.map-toolbar{position:absolute;left:12px;top:12px;display:flex;gap:8px;z-index:1200}
 
-dialog.modal{border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--ink);padding:0;max-width:420px;width:90%}
-.modal header{padding:12px 16px;border-bottom:1px solid var(--border);background:transparent}
-.modal .body{padding:14px 16px}
-.modal .footer{display:flex;gap:8px;justify-content:flex-start;padding:12px 16px;border-top:1px solid var(--border)}
-
-.toast{position:fixed;inset-inline-end:16px;inset-block-end:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow);display:none}
+.toast{position:fixed;inset-inline-end:16px;inset-block-end:16px;background:rgba(20,24,34,.96);
+  border:1px solid var(--border);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);display:none}
 .toast.show{display:block}
 
-/* Responsive */
-@media (max-width: 900px){
-  .container{grid-template-columns:1fr}
-  .sidebar{order:2;height:40vh}
-  .content{order:1;height:auto}
-  body{overflow:auto}
-}
+.empty{display:grid;place-items:center;border:1px dashed var(--border);border-radius:20px;padding:26px;color:var(--muted)}
 
-/* Modes: home (all trips) vs trip (focus one) */
-.container.home-mode{ grid-template-columns: 1fr; }
-.container.home-mode .content{ display: none; }
-.container.home-mode .sidebar{ display: block; width: 100%; max-width: 1100px; margin: 0 auto; }
-.container.home-mode .sidebar .section-title h2{ font-size: 1.6rem; }
-.container.home-mode #tripList.grid{ grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
-
-.container.trip-mode{ grid-template-columns: 1fr; }
-.container.trip-mode .sidebar{ display: none; }
-.container.trip-mode .content{ display: block; }
-
-.brand-text{font-weight:700;letter-spacing:.5px}
-
-
-/* Centered login screen */
-.login-screen{display:grid;place-items:center;height:calc(100vh - 56px);padding:20px}
-.login-card{width:min(420px,92vw);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-.login-card h1{font-size:1.6rem;margin:.2rem 0 .4rem}
-.login-card .input{width:100%}
-
-/* user badge */
-#userBadge{padding:6px 10px;border:1px solid var(--border);border-radius:999px}
-
-
-/* === Budget Bar === */
-.budget-bar{
-  display:flex; align-items:center; gap:16px;
-  border:1px solid var(--border); border-radius:22px; padding:12px 14px; background:var(--card);
+@media (min-width: 900px){
+  .container{grid-template-columns:360px 1fr}
+  .sidebar{border-inline-start:1px solid var(--border);border-bottom:none;height:calc(100vh - 60px)}
+  .tabs{position:sticky;top:64px;bottom:auto;border-top:none;border-bottom:1px solid var(--border)}
 }
-.budget-bar .bar-actions{display:flex; gap:10px}
-.budget-bar .btn.subtle{border:1px solid var(--border); background:transparent; border-radius:12px; padding:6px 12px}
-.budget-bar .bar-cols{display:flex; gap:28px; margin-inline-start:auto}
-.budget-bar .col{display:flex; align-items:center; gap:8px; min-width:120px; justify-content:flex-start}
-.budget-bar .lbl{color:var(--muted); font-size:14px}
-.budget-bar .val{font-size:16px}
-.budget-bar .val.bold{font-weight:700}
-.budget-bar .val.neg{color:var(--danger)}
-.budget-bar .badge{border:1px solid var(--border); border-radius:12px; padding:6px 12px; background:var(--card)}
-
-/* Updated "Meta" tab design */
-#view-meta .card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-}
-
-#view-meta .card .row.dest-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: end;
-}
-/* New style for the map button to match the destination input field */
-#view-meta .btn.map-btn {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  height: 44px; /* Matches the height of the input field */
-}
-
-
-/* New layout for date, people, and trip types */
-#view-meta .date-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
-  align-items: flex-end;
-}
-#view-meta .date-row label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-#view-meta .date-row label:has(#metaStart), #view-meta .date-row label:has(#metaEnd) {
-    grid-column: span 1;
-    width: 100%;
-}
-#view-meta .date-row .people-input {
-  grid-column: 3 / 4;
-}
-#view-meta .date-row .multi-types {
-  grid-column: 4 / 5;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-#view-meta .date-row .multi-types .lbl {
-  font-size: 1em;
-}
-#view-meta .date-row .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-#view-meta .date-row .chips .chip {
-  padding: 6px 10px;
-  flex-shrink: 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-#view-meta .date-row .chips .chip.active {
-  background: var(--brand);
-  color: var(--ink);
-}
-
-/* Budget block */
-#view-meta .budget-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-}
-#view-meta .budget-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 8px;
-}
-#view-meta .budget-actions-row {
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-}
-#view-meta .rates-line {
-  display: none; /* Hide exchange rates section */
-}
-
-#view-meta .row:has(#btnSaveMeta) {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-/* === shrink budget block height by ~20% === */
-#view-meta .budget-block{ padding:9px; gap:6px; }
-#view-meta .budget-row{ gap:6px; }
-#view-meta .budget-actions-row{ gap:8px; }
-#view-meta .budget-block .input{ padding:8px 10px; }
-
-
-/* === Budget row: shrink inputs to 50% width and keep in one line === */
-#view-meta .budget-row{
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); /* always one row, 3 columns */
-  gap: 10px;
-  align-items: end;
-}
-#view-meta .budget-row .input{
-  width: 50% !important; /* half the label width */
-}
-#view-meta .budget-row label{
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* center the half-width inputs */
-}
-
-
-/* === Budget actions in one line, right-aligned, matching input style === */
-#view-meta .budget-actions-row{
-  display: flex;
-  justify-content: flex-end;   /* push to the right */
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-#view-meta .budget-actions-row .btn{
-  padding: 10px 14px;          /* similar to inputs */
-  border-radius: 12px;         /* rounded like inputs */
-  line-height: 1.1;
-  height: 40px;                /* consistent height */
-}
-
-
-/* === Budget layout: 3 currencies on left, actions on right, same row === */
-#view-meta .budget-block{
-  display: grid;
-  grid-template-columns: repeat(3, minmax(100px, 10%)) 1fr repeat(2, minmax(110px, 12%));
-  align-items: end;
-  gap: 4px; /* ~10% of typical 40px wider gaps */
-  padding: 9px; /* keep the compact padding we set earlier */
-}
-#view-meta .budget-row,
-#view-meta .budget-actions-row{
-  display: contents; /* flatten children into grid */
-}
-#view-meta .budget-row label{
-  width: 100%;
-  max-width: 140px;   /* keep the inputs compact */
-}
-#view-meta .budget-row .input{
-  width: 100% !important;
-  padding: 8px 10px;
-}
-#view-meta .budget-actions-row .btn{
-  width: auto;
-  min-width: 120px;
-  height: 40px;
-  padding: 8px 12px;
-  text-align: center;
-}
-
-/* Fallback for very narrow screens: stack nicely */
-@media (max-width: 720px){
-  #view-meta .budget-block{
-    grid-template-columns: 1fr 1fr;
-  }
-  #view-meta .budget-row,
-  #view-meta .budget-actions-row{ display: contents; }
-}
-
-
-/* === Meta: emphasize 'יעד' label like 'תקציב' and unify field heights === */
-#view-meta .dest-row .dest-col{
-  font-weight: 700;
-  font-size: 1.5rem; /* similar to h3 heading size */
-  line-height: 1.2;
-}
-/* Remove 'בדוק במפה' button (no meaning) */
-#btnVerifyOnMap{ display:none !important; }
-/* Unify heights for all inputs in meta section */
-#view-meta .input, 
-#view-meta input[type="date"]{
-  height: 44px;
-  padding: 10px 12px;
-}
-/* Keep chips row aligned to same baseline */
-#view-meta .chips .chip{ height: 36px; display:flex; align-items:center; }
-
-
-/* === Overview tab: stack cards vertically === */
-#view-overview .cards{
-  grid-template-columns: 1fr !important;
-  gap: 16px;
-}
-
-.rate-note{font-size:12px;opacity:.7;margin-top:2px;direction:rtl}
-
-.rate-line{font-size:12px;margin-top:6px;opacity:.75;direction:rtl}
-
-mark {
-  background-color: #ffd166;
-  color: var(--ink);
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-.match-source {
-  font-weight: 700;
-}
-/* Grid mode */
-.grid .trip-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-}
-
-.grid .trip-card strong {
-  font-size: 1.1rem;
-}
-
-.grid .trip-card .muted {
-  margin-top: 0;
-}
-
-.grid .trip-card .pill {
-  width: 60%;
-  justify-self: start;
-}
-.trip-card .pill {
-  border: 1px solid var(--border);
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: .85rem;
-}
-.grid .trip-card .menu-btn {
-  position: absolute;
-  top: 50%;
-  left: 10px; /* מיקום יחסי לכרטיס */
-  transform: translateY(-50%) rotate(90deg); /* יישור למרכז אנכי וסיבוב */
-  border: 1px solid var(--border);
-  background: transparent;
-  border-radius: 10px;
-  padding: 6px 10px;
-}
-
-/* List mode */
-.list .trip-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background-color: var(--card);
-}
-
-.list .trip-row .pill {
-  grid-column: 1;
-  width: fit-content;
-  margin: 0;
-  justify-self: start;
-}
-
-.list .trip-row .menu-btn {
-  grid-column: 2;
-  border: 1px solid var(--border);
-  background: transparent;
-  border-radius: 10px;
-  padding: 6px 10px;
-  justify-self: end;
-}
-
-.list-actions .btn.active {
-  border-color: var(--brand);
-  background: color-mix(in oklab, var(--brand) 20%, transparent);
-}
-.trip-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background-color: var(--card);
-  position: relative; /* הוסף מיקום יחסי כדי למקם את הכפתור */
-}
-
-.trip-card strong {
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.trip-card .muted {
-  font-size: 1rem;
-  color: var(--muted);
-}
-.trip-card > div:first-of-type {
-    margin-bottom: 8px;
-}
-
-/* New style for the pill to be on the same line as the menu button */
-.trip-card .footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.trip-card .menu-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px; /* מיקום בצד שמאל */
-  transform: none;
-  border: none;
-  background: transparent;
-  padding: 6px;
-}
-.trip-card .menu-btn svg {
-  transform: rotate(90deg); /* סיבוב כדי שהנקודות יהיו אנכיות */
-}
-
-/* New: expense and journal location buttons */
-.location-row{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-.location-row label{
-    flex-grow:1;
-}
-.location-row .input{
-    width:100%;
-}
-.location-row .location-btn{
-    flex-shrink:0;
-    height:44px;
-    padding:10px 12px;
-    align-self:stretch;
-    line-height:22px;
-    font-size:14px;
-}
-
-/* New styling for inline links */
-.external-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.external-link svg {
-  width: 14px;
-  height: 14px;
-  stroke: var(--brand); /* Set icon color to brand color */
-}
-
-/* Ensure the link doesn't interfere with the row click */
-td a.external-link {
-  pointer-events: all;
-}
-
-/* Map toolbar buttons */
-.map-toolbar .btn{
-  background: transparent;
-  border: 2px solid var(--border);
-  color: var(--ink);
-  padding: 8px 14px;
-  border-radius: 16px;
-  font-weight: 500;
-  box-shadow: 0 2px 10px rgba(0,0,0,.10);
-}
-/* Per-button colors */
-#btnToggleSpent{ border-color:#ff8c00; color:#ff8c00; }
-#btnToggleSpent.active{ background:#ff8c00; color:#111; border-color:#ff8c00; }
-#btnToggleVisited{ border-color:#1e90ff; color:#1e90ff; }
-#btnToggleVisited.active{ background:#1e90ff; color:#fff; border-color:#1e90ff; }
-
-
-/* === Added by ChatGPT: Uniform Location Controls (input + 2 buttons) === */
-.location-row{
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  align-items: stretch;
-}
-.location-row label{
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: transparent;
-}
-.location-row label .input{
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  text-align: center;
-  padding: 0;
-  font-size: 14px;
-  line-height: 44px;
-}
-.location-row .location-btn{
-  width: 100%;
-  height: 44px;
-  padding: 10px 12px;
-  border-radius: 12px;
-}
-@media (max-width: 520px){
-  .location-row{ grid-template-columns: 1fr 1fr; }
-  .location-row > *:last-child{ grid-column: 1 / -1; }
-}
-/* === End addition === */
-
-
-
-/* === Share card spacing improvements === */
-#view-share .cards .card:last-child .row{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:16px;
-}
-#view-share .cards .card:last-child .row + .row{ margin-top:14px; }
-#view-share .cards .card:last-child .btn{ width:100%; }
-#view-share .cards .card:last-child .input{ width:100%; }
-
-
-/* === Spacing fixes for ייבוא/ייצוא/שיתוף panel === */
-#view-share .card .row{
-  gap: 12px;
-  margin-bottom: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-#view-share .input,
-#view-share .btn,
-#view-share select.input{
-  height: 44px; /* consistent control height */
-}
-#view-share .card h3{
-  margin-bottom: 10px;
-}
-
-/* extra spacing refinement for import/export cards */
-#view-share .card .row + .row { margin-top: 12px; }
-#view-share input[type="file"].input { padding: 10px 12px; }
-
-/* --- Hotfix: ensure mini map in 'Overview' has height and is visible --- */
-#miniMap { min-height: 280px; height: 32vh; }
-.tab[data-tab="overview"] #miniMap { display: block; }
