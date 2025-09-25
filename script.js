@@ -1821,3 +1821,67 @@ if (typeof FB !== 'undefined' && FB?.onAuthStateChanged) {
   });
 }
 try { console.log('firebase project', FB?.auth?.app?.options?.projectId); } catch(e){}
+
+
+// === Desktop Mobile-View Toggle ===
+(function(){
+  try{
+    const KEY = 'flymily_force_mobile';
+    const apply = (on) => {
+      const m = !!on;
+      document.documentElement.classList.toggle('force-mobile', m);
+      document.body.classList.toggle('force-mobile', m);
+      const btn = document.querySelector('.mobile-toggle');
+      if(btn){
+        btn.classList.toggle('active', m);
+        btn.title = m ? 'כבה תצוגת מובייל' : 'הפעל תצוגת מובייל';
+        btn.setAttribute('aria-pressed', m ? 'true' : 'false');
+        btn.innerHTML = '📱';
+      }
+    };
+
+    const makeBtn = () => {
+      const b = document.createElement('button');
+      b.className = 'mobile-toggle';
+      b.type = 'button';
+      b.title = 'הפעל תצוגת מובייל';
+      b.innerHTML = '📱';
+      b.addEventListener('click', () => {
+        const newVal = !(localStorage.getItem(KEY) === '1');
+        localStorage.setItem(KEY, newVal ? '1' : '0');
+        apply(newVal);
+      });
+      return b;
+    };
+
+    const placeBtn = (btn) => {
+      const HEB_TOGGLE_TEXT = 'מצב כהה/בהיר';
+      const pills = Array.from(document.querySelectorAll('button, a, .pill, .btn'));
+      const match = pills.find(el => (el.textContent||'').trim().includes(HEB_TOGGLE_TEXT));
+      if (match && match.parentNode){
+        btn.classList.add('rtl-gap-start','rtl-gap-end');
+        match.parentNode.insertBefore(btn, match.nextSibling);
+        return;
+      }
+
+      // Try to inject near your pills/tabs/header
+      const anchors = document.querySelectorAll('#tabs, .tabs, .topbar, header, .header');
+      for(const el of anchors){
+        // Insert at start of the first suitable container
+        if (el && getComputedStyle(el).display !== 'none'){
+          el.insertBefore(btn, el.firstChild);
+          return;
+        }
+      }
+      // Fallback fixed button
+      btn.classList.add('fixed');
+      document.body.appendChild(btn);
+    };
+
+    const btn = makeBtn();
+    placeBtn(btn);
+    // Apply saved state
+    const saved = localStorage.getItem(KEY) === '1';
+    apply(saved);
+  }catch(e){ console.warn('force-mobile toggle failed', e); }
+})();
