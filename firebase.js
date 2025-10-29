@@ -1,73 +1,90 @@
-// Unified Firebase wrapper exposing the exact names script.js expects.
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getAuth,
-  onAuthStateChanged,
-  signOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  initializeFirestore,
-  setLogLevel,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  serverTimestamp,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  onSnapshot,
-  collection,
-  addDoc,
-  getDocs,
-  enableNetwork,
-  disableNetwork
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// firebase.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { 
+    getAuth, 
+    signInAnonymously, 
+    signInWithCustomToken, 
+    onAuthStateChanged,
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    signOut 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { 
+    getFirestore, 
+    doc, 
+    getDoc, 
+    addDoc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    onSnapshot, 
+    collection, 
+    query, 
+    where, 
+    orderBy, 
+    getDocs, 
+    writeBatch 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// --- CONFIG ---
 const firebaseConfig = {
-  apiKey: "AIzaSyArvkyWzgOmPjYYXUIOdilmtfrWt7WxK-0",
-  authDomain: "travel-416ff.firebaseapp.com",
-  projectId: "travel-416ff",
-  storageBucket: "travel-416ff.appspot.com",
-  messagingSenderId: "1032412697405",
-  appId: "1:1032412697405:web:44c9d7c6c220a3e4a8e3a7"
+  apiKey: "AIzaSyC2o9IuXKBuYsbf_tSWdAPRhZMyvOwG4rc",
+  authDomain: "hapak-lappid.firebaseapp.com",
+  projectId: "hapak-lappid",
+  storageBucket: "hapak-lappid.firebasestorage.app",
+  messagingSenderId: "518813876504",
+  appId: "1:518813876504:web:eff4b8547f4c3094549e6d"
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db  = initializeFirestore(app, { ignoreUndefinedProperties: true, experimentalAutoDetectLongPolling: true });
-setLogLevel("error");
+// For local VS Code development, provide fallback/dummy values for Canvas-specific globals
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-vs-code-app-id'; 
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
 
-// --- AUTH ---
-export const auth = getAuth(app);
-// Convenience named exports (used in a few places)
-export const onAuth = onAuthStateChanged;
-export const signOutUser = () => signOut(auth);
+let app;
+let db;
+let auth;
 
-// --- FB namespace matching script.js expectations ---
-export const FB = {
-  // db & auth handles
-  db, auth,
+// Initialize Firebase App and services
+if (firebaseConfig.apiKey && firebaseConfig.projectId) { 
+    try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        console.log('Firebase initialized successfully from firebase.js');
+    } catch (e) {
+        console.error('Failed to initialize Firebase from firebase.js:', e);
+    }
+} else {
+    console.warn('Firebase config missing or incomplete in firebase.js. Firebase functionality will be limited.');
+}
 
-  // auth API names as expected by script.js
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signOut,
+// Export necessary Firebase modules and functions
+export {
+    app,
+    db,
+    auth,
+    appId, 
+    initialAuthToken, 
+    
+    // Auth functions - these must be exported from firebase.js
+    onAuthStateChanged,
+    signInAnonymously,
+    signInWithCustomToken,
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    signOut, 
 
-  // firestore API surface
-  doc, getDoc, setDoc, updateDoc,
-  collection, addDoc, getDocs,
-  onSnapshot, query, where, orderBy, limit, startAfter,
-  serverTimestamp
+    // Firestore functions
+    doc,
+    getDoc,
+    addDoc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    onSnapshot,
+    collection,
+    query,
+    where,
+    orderBy, 
+    getDocs,
+    writeBatch, 
 };
-
-// Network toggles (optional resilience)
-window.addEventListener("offline", () => disableNetwork(db).catch(()=>{}));
-window.addEventListener("online",  () => enableNetwork(db).catch(()=>{}));
