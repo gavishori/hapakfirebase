@@ -2310,3 +2310,60 @@ if (mainActionBtn) {
 window.addEventListener('resize', () => {
     renderTable(searchInput ? searchInput.value.trim() : '');
 });
+
+// --- Export to Word with 1.5cm margins and full-width table ---
+const exportReportsToWord = () => {
+    if (!reports || reports.length === 0) {
+        alert('אין דיווחים לייצוא.');
+        return;
+    }
+
+    let content = `
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 1.5cm; }
+body { font-family: "Assistant", sans-serif; direction: rtl; text-align: right; margin: 0; }
+h1 { text-align: center; color: #4A443E; margin: 0.3cm 0; font-size: 20pt; }
+table { border-collapse: collapse; width: 100%; max-width: 100%; table-layout: auto; word-wrap: break-word; overflow-wrap: anywhere; }
+th, td { border: 1px solid #999; padding: 8px; text-align: right; vertical-align: top; font-size: 12pt; }
+th { background-color: #f5f5f5; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>יומן חפ"ק - דוח יומי</h1>
+<table>
+<thead>
+<tr><th>דיווח</th><th>תאריך</th><th>שעה</th><th>מדווח</th><th>שיוך</th></tr>
+</thead>
+<tbody>`;
+
+    reports.forEach(r => {
+        content += `<tr>
+<td>${r.description || ''}</td>
+<td>${r.date || ''}</td>
+<td>${r.time || ''}</td>
+<td>${r.reporter || ''}</td>
+<td>${r.logType || ''}</td>
+</tr>`;
+    });
+
+    content += `</tbody></table></body></html>`;
+
+    const blob = new Blob(['\ufeff', content], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}-${today.getDate().toString().padStart(2,'0')}`;
+    link.download = `יומן חפק - ${dateStr}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnWord = document.getElementById('exportWordBtn');
+    if (btnWord) btnWord.addEventListener('click', exportReportsToWord);
+});

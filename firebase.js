@@ -30,7 +30,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyC2o9IuXKBuYsbf_tSWdAPRhZMyvOwG4rc",
   authDomain: "hapak-lappid.firebaseapp.com",
   projectId: "hapak-lappid",
-  storageBucket: "hapak-lappid.appspot.com",
+  storageBucket: "hapak-lappid.firebasestorage.app",
   messagingSenderId: "518813876504",
   appId: "1:518813876504:web:eff4b8547f4c3094549e6d"
 };
